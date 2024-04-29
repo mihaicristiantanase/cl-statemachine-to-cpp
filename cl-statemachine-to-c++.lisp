@@ -343,7 +343,7 @@
     (with-open-file (f path-usage :direction :output :if-exists :supersede)
       (write-string code-usage f))
     (format t "~&Verifying output by compiling…~%")
-    (format t "~&~a~%" (shell:run t "g++" path-code path-usage))
+    (format t "~&~a~%" (shell:run t "g++" "-std=c++11" path-code path-usage))
     (format t "~&Done. Please check ~a for the generated C++ file~% ~
                  and ~a for a sample code of how to use."
             path-code path-usage)))
