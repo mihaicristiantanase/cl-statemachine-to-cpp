@@ -6,3 +6,7 @@
     (loop for var in lst
           do (unless (gethash var seen) (setf (gethash var seen) t)))
     (loop for key being the hash-keys of seen collect key)))
+
+(defun s+ (&rest strings)
+  "Documentation for s+ with parameters &rest strings"
+  (apply #'concatenate 'string strings))
