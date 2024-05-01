@@ -24,5 +24,5 @@
                   (e go-to-f f))))
 
 (cl-statemachine-to-c++:save-and-check-c++ machine
-  "/tmp/StateMacpphine.cpp"
-  "/tmp/StateMacpphineUsage.cpp")
+  "/tmp/Machine.hpp"
+  "/tmp/MachineTest.cpp")

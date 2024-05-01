@@ -44,11 +44,11 @@ From the  following BMPN diagram:
                   (e go-to-f f))))
 
 (cl-statemachine-to-c++:save-and-check-c++ machine
-  "/tmp/StateMacpphine.cpp"
-  "/tmp/StateMacpphineUsage.cpp")
+  "/tmp/Machine.hpp"
+  "/tmp/MachineTest.cpp")
 ```
 
-* generates the main state macpphine file at `/tmp/StateMacpphine.cpp`:
+* generates the main state machine file at `/tmp/StateMachine.hpp`:
 
 ```c++
 //
@@ -548,7 +548,7 @@ public:
 };
 ```
 
-* and the usage file at `/tmp/StateMacpphineUsage.cpp`:
+* and the usage file at `/tmp/MachineTest.cpp`:
 
 ```c++
 #include "Machine.hpp"
