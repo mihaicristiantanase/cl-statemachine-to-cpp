@@ -190,7 +190,7 @@
   (wl)
   (define-c++-class "StateMachine"
     (define-c++-class-section "public"
-      (wl "typedef std::function<void(bool, std::exception)> Completion;"))
+      (wl "typedef std::function<void(bool, std::exception&)> Completion;"))
 
     ;; TODO(mihai): separate sections
     ;; (define-c++-class-section "private")
@@ -303,7 +303,7 @@
            (wl "if (!actionExec) {")
            (wl "  throw Err(kErrIdTransitionNotSet, state, action);")
            (wl "}")
-           (define-c++-block "actionExec([&](bool success, std::exception e)"
+           (define-c++-block "actionExec([&](bool success, std::exception& e)"
                (define-c++-block "if (!success)"
                    (wl "lastActionError = Err(e.what());")
                  (wl "completion(false, e);")
@@ -363,11 +363,11 @@
             (wl "sm.start();")
             (wl)
             (wl "std::cout << \"This returns a specific exception:\" << std::endl;")
-            (wl "sm.doActionExecuteSomething([](bool success, std::exception e) {")
-            (wl "  std::cout << \"success:\" << success << std::endl;")
-            (wl "  std::cout << \"e:\" << e.what() << std::endl;")
-            (wl "});")
-            ))
+            (define-c++-block "sm.doActionExecuteSomething([&](bool success, std::exception& e)"
+                (define-c++-block "if (!success)"
+                  (wl "  std::cout << \"-- success: false\" << std::endl;")
+                  (wl "  std::cout << \"-- error: \" << sm.errorDescription() << std::endl;")))
+            (wl ");")))
     (define-c++-class-section "private"
         (dolist (action (slot-value *machine* 'actions))
           (let ((func-name (format nil "~a~a"
