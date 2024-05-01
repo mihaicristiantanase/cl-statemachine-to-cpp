@@ -189,6 +189,12 @@
   (wl "#include <exception>")
   (wl)
   (define-c++-class "StateMachine"
+    (define-c++-class-section "public"
+      (wl "typedef std::function<void(bool, std::exception)> Completion;"))
+
+    ;; TODO(mihai): separate sections
+    ;; (define-c++-class-section "private")
+
     (define-c++-enum "TriBool" '((unknown . -1) (false . 0) (true . 1)))
     (define-c++-doc "The states of the state machine. A state fully defines properties necessary to decide user actions.")
     (define-c++-enum "State" (get-states *machine*))
@@ -199,16 +205,15 @@
         (define-c++-class-section "public"
           (wl "ErrId err;")
           (wl "std::string message;")
-          (wl "")
+          (wl)
           (define-c++-block "Err() : err(kErrIdSuccess)")
           (define-c++-block "Err(ErrId err, State state, Action action) : err(err)"
             (wl "this->message = \"state:\" + enumNameForState(state) + \" action:\" + enumNameForAction(action);"))
           (define-c++-block "Err(std::string message) : err(kErrIdGeneralError)"
             (wl "this->message = message;"))))
-    (wl "typedef std::function<void(bool, std::exception)> Completion;")
     (wl "typedef std::function<void(Completion)> ActionExecutor;")
     (wl "typedef std::tuple<State, Action, State> Transition;")
-    (wlb "typedef std::function<TriBool()> Decision;")
+    (wlb "typedef std::function<bool()> Decision;")
     (define-c++-doc "Flag to indicate whether or not this class prints debugging messages.")
     (wlb "bool isLogEnabled = false;")
     (define-c++-doc "Current state.")
@@ -329,7 +334,7 @@
                     for i from 0 do
                       (if (listp decision)
                           (let ((sd (sym->decision (car decision))))
-                            (define-c++-block (format nil "~:[~;else ~]if (~a() == ~a)" (> i 0) sd (to-const-sym "true" "TriBool"))
+                            (define-c++-block (format nil "~:[~;else ~]if (~a())" (> i 0) sd)
                               (wl (format nil "moveToState(~a);" (state-const-sym (sym->camelcase (cdr decision)))))))
                           (define-c++-block "else"
                             (wl (format nil "moveToState(~a);" (state-const-sym (sym->camelcase decision))))))))
@@ -339,28 +344,33 @@
           (wl "std::cout << \"StateMachine: \" << msg << std::endl;")))))
 
 (defun gen-usage-stream ()
-  ;; (define-c++-class "StateMachineTest"
-  ;;     (define-c++-fun "test" "void" ""
-  ;;       (wl "let sm = StateMachine.create()")
-  ;;       (loop-decisions (decision)
-  ;;                       (wl (format nil "sm.setDecision~a { [weak self] in /*TODO*/ self?.tautology() }"
-  ;;                                   (sym->pascalcase decision))))
-  ;;       (dolist (action (slot-value *machine* 'actions))
-  ;;         (wl (format nil "sm.setAction~a { [weak self] in self?.~a~a($0) }"
-  ;;                     (sym->pascalcase action)
-  ;;                     (sym->camelcase action)
-  ;;                     (sym->pascalcase (slot-value *machine* 'context)))))
-  ;;       (wl "sm.start()"))
-  ;;   (dolist (action (slot-value *machine* 'actions))
-  ;;     (let ((func-name (format nil "~a~a"
-  ;;                               (sym->camelcase action)
-  ;;                               (sym->pascalcase (slot-value *machine* 'context)))))
-  ;;       (define-c++-fun func-name "_ completion: StateMachine.Completion"
-  ;;         (wl (format nil "// TODO: add logic for ~a" func-name)))))
-  ;;   (define-c++-block "private func tautology() -> Bool"
-  ;;     (wl "return true")))
+  ;; TODO(mihai): don't hardcode header
+  (wl "#include \"Machine.hpp\"")
+  (wl)
+  (define-c++-class "StateMachineTest"
+      (define-c++-class-section "public"
+          (define-c++-fun "test" "void" ""
+            (wl "StateMachine sm = StateMachine::create();")
+            (loop-decisions (decision)
+                            (wl (format nil "sm.setDecision~a([&]() { /*TODO*/ return tautology(); });"
+                                        (sym->pascalcase decision))))
+            (dolist (action (slot-value *machine* 'actions))
+              (wl (format nil "sm.setAction~a([&](StateMachine::Completion completion) { ~a~a(completion); });"
+                          (sym->pascalcase action)
+                          (sym->camelcase action)
+                          (sym->pascalcase (slot-value *machine* 'context)))))
+            (wl "sm.start();")))
+    (define-c++-class-section "private"
+        (dolist (action (slot-value *machine* 'actions))
+          (let ((func-name (format nil "~a~a"
+                                   (sym->camelcase action)
+                                   (sym->pascalcase (slot-value *machine* 'context)))))
+            (define-c++-fun func-name "void" "StateMachine::Completion completion"
+              (wl (format nil "// TODO: add logic for ~a" func-name)))))
+      (define-c++-fun "tautology" "bool" ""
+        (wl "return true;"))))
   (define-c++-fun "main" "int" "int argc, char** argv"
-    ;; (wl "StateMachineTest().test()")
+    (wl "StateMachineTest().test();")
     (wl "return 0;")))
 
 (defun gen-code ()
@@ -381,7 +391,7 @@
     (with-open-file (f path-usage :direction :output :if-exists :supersede)
       (write-string code-usage f))
     (format t "~&Verifying output by compiling…~%")
-    (format t "~&~a~%" (shell:run t "g++" "-std=c++11" path-code path-usage))
+    (format t "~&~a~%" (shell:run t "g++" "-std=c++11" path-usage))
     (format t "~&Done. Please check ~a for the generated C++ file~% ~
                  and ~a for a sample code of how to use."
             path-code path-usage)))
