@@ -360,7 +360,13 @@
                           (sym->pascalcase action)
                           (sym->camelcase action)
                           (sym->pascalcase (slot-value *machine* 'context)))))
-            (wl "sm.start();")))
+            (wl "sm.start();")
+            (wl)
+            (wl "sm.doActionExecuteSomething([](bool success, std::exception e) {")
+            (wl "  std::cout << \"success:\" << success << std::endl;")
+            (wl "  std::cout << \"e:\" << e.what() << std::endl;")
+            (wl "});")
+            ))
     (define-c++-class-section "private"
         (dolist (action (slot-value *machine* 'actions))
           (let ((func-name (format nil "~a~a"
