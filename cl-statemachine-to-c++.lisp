@@ -129,7 +129,7 @@
      (wl (s+ "try {"))
      (let ((*indent* (+ *indent* 2)))
        ,@try-block)
-     (wl (s+ "} catch (std::exception &e) {"))
+     (wl (s+ "} catch (std::exception& e) {"))
      (let ((*indent* (+ *indent* 2)))
        ,@catch-block)
      (wl "}")
@@ -282,7 +282,7 @@
       (wl "// start the machine")
       (define-c++-block "try"
           (wl "moveToState(state);"))
-      (define-c++-block "catch (std::exception &e)"
+      (define-c++-block "catch (std::exception& e)"
           (wl "throw std::runtime_error(e.what());")))
     (wl "StateMachine(State state) {")
     (wl "  this->state = state;")
