@@ -3,7 +3,6 @@
 ;;; TODO: beautify code (ex: join "else", "catch" lines)
 ;;; TODO: remove trailing white spaces
 ;;; TODO: cleanup common lisp code
-;; TODO(mihai): TriBool made sense in Swift (ie, optional Bool), does it make sense here?
 
 (in-package #:cl-statemachine-to-c++)
 
@@ -194,7 +193,6 @@
     ;; TODO(mihai): separate sections
     ;; (define-c++-class-section "private")
 
-    (define-c++-enum "TriBool" '((unknown . -1) (false . 0) (true . 1)))
     (define-c++-doc "The states of the state machine. A state fully defines properties necessary to decide user actions.")
     (define-c++-enum "State" (get-states *machine*))
     (define-c++-doc "The actions of the state machine. An action connects two states.")
