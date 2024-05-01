@@ -3,6 +3,7 @@
 ;;; TODO: beautify code (ex: join "else", "catch" lines)
 ;;; TODO: remove trailing white spaces
 ;;; TODO: cleanup common lisp code
+;; TODO(mihai): fix auto e = std::exception() hack
 
 (in-package #:cl-statemachine-to-c++)
 
