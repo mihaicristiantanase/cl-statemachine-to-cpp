@@ -3,7 +3,6 @@
 ;;; TODO: beautify code (ex: join "else", "catch" lines)
 ;;; TODO: remove trailing white spaces
 ;;; TODO: cleanup common lisp code
-;; TODO(mihai): are types leaking outside StateMachine class?
 ;; TODO(mihai): TriBool made sense in Swift (ie, optional Bool), does it make sense here?
 
 (in-package #:cl-statemachine-to-c++)
