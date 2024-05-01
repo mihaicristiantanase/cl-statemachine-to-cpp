@@ -4,6 +4,7 @@
 ;;; TODO: remove trailing white spaces
 ;;; TODO: cleanup common lisp code
 ;; TODO(mihai): are types leaking outside StateMachine class?
+;; TODO(mihai): TriBool made sense in Swift (ie, optional Bool), does it make sense here?
 
 (in-package #:cl-statemachine-to-c++)
 
@@ -27,7 +28,7 @@
     transition-not-set
     invalid-transition
     invalid-decision
-    action-error))
+    general-error))
 
 (defparameter *indent* 0)
 (defparameter *stream* nil)
@@ -97,7 +98,7 @@
 
 (defun err-const-sym (s)
   "Documentation for err-const-sym with parameters s"
-  (to-const-sym s "err"))
+  (to-const-sym s "ErrId"))
 
 (defun define-c++-doc (doc)
   (wl "/**")
@@ -116,6 +117,12 @@
        ,@body)
      (wl "}~:[~;;~]" (semicolon-block-p ,firstline))
      (wl)))
+
+(defmacro define-c++-class-section (section-name &rest body)
+  `(progn
+     (let ((*indent* (- *indent* 2)))
+       (wl (s+ ,section-name ":")))
+     ,@body))
 
 (defmacro define-c++-cont (firstline &rest body)
   `(progn
@@ -136,7 +143,15 @@
         (unless (consp c) (setf c (cons c nil)))
         (wl "  ~a~:[~; = ~a~],"
             (to-const-sym (sym->camelcase (car c)) name)
-            (cdr c) (cdr c)))))
+            (cdr c) (cdr c))))
+  (define-c++-fun (s+ "enumNameFor" name)
+    "static std::string" (s+ name " item")
+    (define-c++-block "switch (item)"
+      (dolist (c cases)
+        (let ((casename (to-const-sym (sym->camelcase (if (consp c) (car c) c))
+                                      name)))
+          (wl "case ~a:" casename)
+          (wl "return \"~a.~a\";" name casename))))))
 
 (defmacro define-c++-class (name &rest body)
   `(define-c++-block (format nil "class ~a" ,name) ,@body))
@@ -161,17 +176,26 @@
   (wl)
   (wl "#include <iostream>")
   (wl "#include <functional>")
+  (wl "#include <exception>")
   (wl)
   (define-c++-class "StateMachine"
     (define-c++-enum "TriBool" '((unknown . -1) (false . 0) (true . 1)))
-    ;; TODO(mihai): make Err an std::exception
-    (define-c++-enum "Err" *errors*)
     (define-c++-doc "The states of the state machine. A state fully defines properties necessary to decide user actions.")
     (define-c++-enum "State" (get-states *machine*))
     (define-c++-doc "The actions of the state machine. An action connects two states.")
     (define-c++-enum "Action" (slot-value *machine* 'actions))
-    (wl "typedef int Error;")
-    (wl "typedef std::function<void(bool, Error)> Completion;")
+    (define-c++-enum "ErrId" *errors*)
+    (define-c++-class "Err : std::exception"
+        (define-c++-class-section "public"
+          (wl "const ErrId err;")
+          (wl "std::string message;")
+          (wl "")
+          (define-c++-block "Err() : err(kErrIdSuccess)")
+          (define-c++-block "Err(ErrId err, State state, Action action) : err(err)"
+            (wl "this->message = \"state:\" + enumNameForState(state) + \" action:\" + enumNameForAction(action);"))
+          (define-c++-block "Err(std::string message) : err(kErrIdGeneralError)"
+            (wl "this->message = message;"))))
+    (wl "typedef std::function<void(bool, std::exception)> Completion;")
     (wl "typedef std::function<void(Completion)> ActionExecutor;")
     (wl "typedef std::tuple<State, Action, State> Transition;")
     (wlb "typedef std::function<TriBool()> Decision;")
@@ -203,17 +227,11 @@
     (wl (format nil "  return StateMachine(~a);"
                 (state-const-sym (sym->camelcase (get-start *machine*)))))
     (wlb "}")
-    ;; (define-c++-doc "Description of the error from last action.")
-    ;; (define-c++-fun "errorDescription" "std::string" ""
-    ;;     (define-c++-block (format nil "if (lastActionError != ~a)" (err-const-sym "success"))
-    ;;         (define-c++-block "if let err = error as? Err"
-    ;;             (define-c++-cont "return \"\\(err)\""
-    ;;                 (wl ".replacingOccurrences(of: \"(\", with: \":\")")
-    ;;               (wl ".replacingOccurrences(of: \")\", with: \"\")")
-    ;;               (wl ".replacingOccurrences(of: \"\\\"\", with: \" \")")
-    ;;               (wl ".trimmingCharacters(in: .whitespacesAndNewlines)")))
-    ;;       (wl "return error.localizedDescription"))
-    ;;   (wl "return \"\""))
+    (define-c++-doc "Description of the error from last action.")
+    (define-c++-fun "errorDescription" "std::string" ""
+        (define-c++-block (format nil "if (lastActionError.err != ~a)" (err-const-sym "success"))
+          (wl "return lastActionError.message;"))
+      (wl "return \"\";"))
     (loop-decisions (decision)
                     (wl)
                     (define-c++-doc (format nil "Set decision for ~a" (sym->decision decision)))
@@ -232,27 +250,25 @@
         (define-c++-fun (format nil "doAction~a" ap) "void" "Completion completion"
           (wl (format nil "log(\"doAction~a\");" ap))
           (wl (format nil "doAction(~a, completion);" (action-const-sym ac))))))
-    (wl)
-    ;; (define-c++-doc "Start method. Must be called, otherwise, the state machine is not running.")
-    ;; (define-c++-fun "start" ""
-    ;;   (wl "// check decisions")
-    ;;   (loop-decisions (decision)
-    ;;                   (define-c++-block (format nil "if ~a == nil" (sym->decision decision))
-    ;;                     (wl (format nil "fatalError(\"Machine not started because decision '~a' is missing\")"
-    ;;                                 (sym->camelcase decision)))))
-    ;;   (wl)
-    ;;   (wl "// check actions")
-    ;;   (dolist (action (slot-value *machine* 'actions))
-    ;;     (define-c++-block (format nil "if action~a == nil" (sym->pascalcase action))
-    ;;       (wl (format nil "fatalError(\"Machine not started because action '~a' is missing\")"
-    ;;                   (sym->camelcase action)))))
-    ;;   (wl)
-    ;;   (wl "// start the machine")
-    ;;   (define-c++-block "do"
-    ;;       (wl "try moveToState(state)"))
-    ;;   (define-c++-block "catch"
-    ;;       (wl "fatalError(\"\\(error)\")")))
-    ;; (wl)
+    (define-c++-doc "Start method. Must be called, otherwise, the state machine is not running.")
+    (define-c++-fun "start" "void" ""
+      (wl "// check decisions")
+      (loop-decisions (decision)
+                      (define-c++-block (format nil "if (!~a)" (sym->decision decision))
+                        (wl (format nil "throw Err(\"Machine not started because decision '~a' is missing\");"
+                                    (sym->camelcase decision)))))
+      (wl)
+      (wl "// check actions")
+      (dolist (action (slot-value *machine* 'actions))
+        (define-c++-block (format nil "if (!action~a)" (sym->pascalcase action))
+          (wl (format nil "throw std::invalid_argument(\"Machine not started because action '~a' is missing\");"
+                      (sym->camelcase action)))))
+      (wl)
+      (wl "// start the machine")
+      (define-c++-block "try"
+          (wl "moveToState(state);"))
+      (define-c++-block "catch (std::exception &e)"
+          (wl "throw std::runtime_error(e.what());")))
     (wl "StateMachine(State state) {")
     (wl "  this->state = state;")
     (wlb "}")
@@ -271,7 +287,7 @@
       ;; (wl "do {")
       ;; (wl "  let transition = try findTransition(action)")
       ;; (wl "  if actionExec == nil {")
-      ;; (wl "    throw Err.transitionNotSet(state, action)")
+      ;; (wl "    throw ErrId.transitionNotSet(state, action)")
       ;; (wl "  }")
       ;; (wl "  actionExec {")
       ;; (wl "    [weak self] success, error in")
@@ -296,32 +312,28 @@
       ;; (wl "  completion(false, error)")
       ;; (wl "}")
       )
-    ;; (wl)
-    ;; (wl "private func findTransition(_ action: Action) throws -> Transition {")
-    ;; (wl "  for t in transitions {")
-    ;; (wl "    if t.0 == state, t.1 == action {")
-    ;; (wl "      return t")
-    ;; (wl "    }")
-    ;; (wl "  }")
-    ;; (wl "  throw Err.impossibleAction(state, action)")
-    ;; (wlb "}")
-    ;; (define-c++-block "private func moveToState(_ state: State) throws"
-    ;;   (wl "self.state = state")
-    ;;   (wlb "log(\"moveToState \\(state)\")")
-    ;;   (define-c++-block "switch state"
-    ;;       (dolist (state (get-states *machine*))
-    ;;         (wl (format nil "case .~a:" (sym->camelcase state)))
-    ;;         (unless (stable-state state *machine*)
-    ;;           (loop for decision in (get-unstable-state-decisions state *machine*)
-    ;;                 for i from 0 do
-    ;;                   (if (listp decision)
-    ;;                       (let ((sd (sym->decision (car decision))))
-    ;;                         (define-c++-block (format nil "~:[~;else ~]if ~a() ?? false" (> i 0) sd)
-    ;;                           (wl (format nil "try moveToState(.~a)" (sym->camelcase (cdr decision))))))
-    ;;                       (define-c++-block "else"
-    ;;                         (wl (format nil "try moveToState(.~a)" (sym->camelcase decision)))))))
-    ;;         (wl "break"))))
-    ;; (wl)
+    (define-c++-fun "findTransition" "Transition" "Action action"
+      (define-c++-block "for (auto cand : transitions)"
+          (wl "if (std::get<0>(cand) == state && std::get<1>(cand) == action) {")
+        (wl "  return cand;")
+        (wl "}"))
+        (wl "throw Err(kErrIdImpossibleAction, state, action);"))
+    (define-c++-fun "moveToState" "void" "State state"
+      (wl "this->state = state;")
+      (wlb "log(\"moveToState \\(state)\");")
+      (define-c++-block "switch (state)"
+          (dolist (state (get-states *machine*))
+            (wl (format nil "case ~a:" (state-const-sym (sym->camelcase state))))
+            (unless (stable-state state *machine*)
+              (loop for decision in (get-unstable-state-decisions state *machine*)
+                    for i from 0 do
+                      (if (listp decision)
+                          (let ((sd (sym->decision (car decision))))
+                            (define-c++-block (format nil "~:[~;else ~]if (~a() == ~a)" (> i 0) sd (to-const-sym "true" "TriBool"))
+                              (wl (format nil "moveToState(~a);" (state-const-sym (sym->camelcase (cdr decision)))))))
+                          (define-c++-block "else"
+                            (wl (format nil "moveToState(~a);" (state-const-sym (sym->camelcase decision))))))))
+            (wl "break;"))))
     (define-c++-fun "log" "void" "std::string msg"
       (define-c++-block "if (isLogEnabled)"
           (wl "std::cout << \"StateMachine: \" << msg << std::endl;")))
