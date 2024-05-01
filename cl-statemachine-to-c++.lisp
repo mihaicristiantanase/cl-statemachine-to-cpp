@@ -377,7 +377,9 @@
                                    (sym->camelcase action)
                                    (sym->pascalcase (slot-value *machine* 'context)))))
             (define-c++-fun func-name "void" "StateMachine::Completion completion"
-              (wl (format nil "// TODO: add logic for ~a" func-name)))))
+              (wl (format nil "// TODO: add logic for ~a" func-name))
+              (wl "auto e = std::exception();")
+              (wl "completion(true, e);"))))
       (define-c++-fun "tautology" "bool" ""
         (wl "return true;"))))
   (define-c++-fun "main" "int" "int argc, char** argv"
