@@ -351,6 +351,7 @@
       (define-c++-class-section "public"
           (define-c++-fun "test" "void" ""
             (wl "StateMachine sm = StateMachine::create();")
+            (wl "sm.isLogEnabled = true;")
             (loop-decisions (decision)
                             (wl (format nil "sm.setDecision~a([&]() { /*TODO*/ return tautology(); });"
                                         (sym->pascalcase decision))))
