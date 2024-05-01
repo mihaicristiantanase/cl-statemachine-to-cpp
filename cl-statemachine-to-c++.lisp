@@ -128,8 +128,7 @@
   `(progn
      (wl ,firstline)
      (let ((*indent* (+ *indent* 2)))
-       ,@body
-       )))
+       ,@body)))
 
 (defmacro define-c++-sfun (name params &rest body)
   `(define-c++-block (format nil "static func ~a(~a)" ,name ,params) ,@body))
@@ -336,8 +335,7 @@
             (wl "break;"))))
     (define-c++-fun "log" "void" "std::string msg"
       (define-c++-block "if (isLogEnabled)"
-          (wl "std::cout << \"StateMachine: \" << msg << std::endl;")))
-    ))
+          (wl "std::cout << \"StateMachine: \" << msg << std::endl;")))))
 
 (defun gen-usage-stream ()
   ;; (define-c++-class "StateMachineTest"
