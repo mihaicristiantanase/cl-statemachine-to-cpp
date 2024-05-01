@@ -325,7 +325,7 @@
         (wl "throw Err(kErrIdImpossibleAction, state, action);"))
     (define-c++-fun "moveToState" "void" "State state"
       (wl "this->state = state;")
-      (wlb "log(\"moveToState \\(state)\");")
+      (wlb "log(\"moveToState \" + enumNameForState(state));")
       (define-c++-block "switch (state)"
           (dolist (state (get-states *machine*))
             (wl (format nil "case ~a:" (state-const-sym (sym->camelcase state))))
