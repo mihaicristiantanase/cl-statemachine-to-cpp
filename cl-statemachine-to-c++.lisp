@@ -201,7 +201,7 @@
     (define-c++-doc "The actions of the state machine. An action connects two states.")
     (define-c++-enum "Action" (slot-value *machine* 'actions))
     (define-c++-enum "ErrId" *errors*)
-    (define-c++-class "Err : std::exception"
+    (define-c++-class "Err : public std::exception"
         (define-c++-class-section "public"
           (wl "ErrId err;")
           (wl "std::string message;")
