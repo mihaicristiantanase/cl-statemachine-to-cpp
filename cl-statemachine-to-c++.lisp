@@ -362,6 +362,7 @@
                           (sym->pascalcase (slot-value *machine* 'context)))))
             (wl "sm.start();")
             (wl)
+            (wl "std::cout << \"This returns a specific exception:\" << std::endl;")
             (wl "sm.doActionExecuteSomething([](bool success, std::exception e) {")
             (wl "  std::cout << \"success:\" << success << std::endl;")
             (wl "  std::cout << \"e:\" << e.what() << std::endl;")
