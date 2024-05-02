@@ -402,8 +402,12 @@
     (with-open-file (f path-usage :direction :output :if-exists :supersede)
       (write-string code-usage f))
     (format t "~&Verifying output by compiling…~%")
-    (format t "~&~{~a~%~}~%" (shell:run t "g++" "-std=c++11" "-g" "-o" "/tmp/sm" path-usage))
-    (format t "~&~{~a~%~}~%" (shell:run t "/tmp/sm"))
+    (unless (do-shell (s+ "g++ -std=c++11 -g -o /tmp/sm " path-usage))
+      (format t "~&There was an error.~%")
+      (return-from save-and-check-c++))
+    (unless (do-shell "/tmp/sm")
+      (format t "~&There was an error.~%")
+      (return-from save-and-check-c++))
     (format t "~&Done. Please check ~a for the generated C++ file~% ~
                  and ~a for a sample code of how to use."
             path-code path-usage)))
