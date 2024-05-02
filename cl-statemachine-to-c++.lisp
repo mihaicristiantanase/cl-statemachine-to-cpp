@@ -7,14 +7,18 @@
 
 (defclass Machine ()
   ((context
+    :reader context
     :initarg :context)
    (states
     :initarg :states
+    :reader states
     :initform nil)
    (transitions
     :initarg :transitions
+    :reader transitions
     :initform nil)
    (actions
+    :reader actions
     :initform nil)))
 
 (defparameter *machine* nil)
@@ -31,20 +35,26 @@
 (defparameter *stream* nil)
 
 (defun stable-state (state machine)
-  (not (null (find state (slot-value machine 'states)))))
+  (not (null (find state (states machine)))))
 
 (defgeneric get-start (machine))
 (defgeneric get-states (machine))
 (defgeneric get-unstable-state-decisions (state machine))
 
 (defmethod initialize-instance :after ((machine Machine) &key)
-  (dolist (transition (slot-value machine 'transitions))
+  ;; validate transitive states
+  (let ((bad-states (set-difference
+                     (transitive-states machine)
+                     (mapcar #'(lambda (s) (if (consp s) (car s) s)) (states machine)))))
+    (when bad-states
+      (error "Found transitive states ~a that are not defined as states" bad-states)))
+  (dolist (transition (transitions machine))
     (unless (caddr transition)
       (setf (caddr transition) (car transition))))
   ;; auto-fill actions
-  (setf (slot-value machine 'actions)
+  (setf (actions machine)
         (sort (unique-list
-               (mapcar #'second (slot-value machine 'transitions)))
+               (mapcar #'second (transitions machine)))
               #'string<
               :key #'symbol-name)))
 
@@ -53,10 +63,10 @@
 
 (defmethod get-states ((machine Machine))
   (mapcar #'(lambda (s) (if (symbolp s) s (car s)))
-          (slot-value machine 'states)))
+          (states machine)))
 
 (defmethod get-unstable-state-decisions (state (machine Machine))
-  (dolist (s (slot-value machine 'states))
+  (dolist (s (states machine))
     (when (and (listp s) (eq (car s) state))
       (return-from get-unstable-state-decisions (cdr s)))))
 
@@ -191,7 +201,7 @@
     (define-c++-doc "The states of the state machine. A state fully defines properties necessary to decide user actions.")
     (define-c++-enum "State" (get-states *machine*))
     (define-c++-doc "The actions of the state machine. An action connects two states.")
-    (define-c++-enum "Action" (slot-value *machine* 'actions))
+    (define-c++-enum "Action" (actions *machine*))
     (define-c++-enum "ErrId" *errors*)
     (wl "typedef std::function<void(bool, std::exception*)> Completion;")
     (wl "typedef std::function<void(Completion)> ActionExecutor;")
@@ -229,7 +239,7 @@
                     (define-c++-fun (format nil "setDecision~a" (sym->pascalcase decision)) "void"
                       "Decision decision"
                       (wl (format nil "~a = decision;" (sym->decision decision)))))
-    (dolist (action (slot-value *machine* 'actions))
+    (dolist (action (actions *machine*))
       (let ((ap (sym->pascalcase action))
             (ac (sym->camelcase action)))
         (define-c++-doc (format nil "Set action ~a" (action-const-sym ac)))
@@ -258,7 +268,7 @@
                                     (sym->camelcase decision)))))
       (wl)
       (wl "// check actions")
-      (dolist (action (slot-value *machine* 'actions))
+      (dolist (action (actions *machine*))
         (define-c++-block (format nil "if (!action~a)" (sym->pascalcase action))
           (wl (format nil "throw Err(\"Machine not started because action '~a' is missing\");"
                       (sym->camelcase action)))))
@@ -278,7 +288,7 @@
     (define-c++-doc "Last action error.")
     (wlb "std::exception* lastActionError = NULL;")
     (define-c++-doc "Actions")
-    (dolist (action (slot-value *machine* 'actions))
+    (dolist (action (actions *machine*))
       (wl "ActionExecutor action~a;" (sym->pascalcase action)))
     (wl)
     (define-c++-doc "Decisions")
@@ -286,7 +296,7 @@
                     (wl "Decision ~a;" (sym->decision decision)))
     (wl)
     (define-c++-doc "Transitions")
-    (let ((transitions (slot-value *machine* 'transitions)))
+    (let ((transitions (transitions *machine*)))
       (wl "Transition transitions[~a] = {" (length transitions))
       (dolist (trans transitions)
         (wl "  {~{~a~^, ~}}," (list (state-const-sym (nth 0 trans))
@@ -301,7 +311,7 @@
       (wl)
       (wl "ActionExecutor actionExec;")
       (define-c++-block "switch (action)"
-          (dolist (action (slot-value *machine* 'actions))
+          (dolist (action (actions *machine*))
             (let ((ac (sym->camelcase action))
                   (ap (sym->pascalcase action)))
               (wl (format nil "case ~a:" (action-const-sym ac)))
@@ -363,11 +373,11 @@
             (loop-decisions (decision)
                             (wl (format nil "sm.setDecision~a([&]() { /*TODO*/ return tautology(); });"
                                         (sym->pascalcase decision))))
-            (dolist (action (slot-value *machine* 'actions))
+            (dolist (action (actions *machine*))
               (wl (format nil "sm.setAction~a([&](StateMachine::Completion completion) { ~a~a(completion); });"
                           (sym->pascalcase action)
                           (sym->camelcase action)
-                          (sym->pascalcase (slot-value *machine* 'context)))))
+                          (sym->pascalcase (context *machine*)))))
             (wl "sm.start();")
             (wl)
             (wl "std::cout << \"-- This returns a specific exception:\" << std::endl;")
@@ -380,10 +390,10 @@
               (wl "std::cout << \"-- success:\" << success << std::endl;"))
             (wl ");")))
     (define-c++-class-section "private"
-        (dolist (action (slot-value *machine* 'actions))
+        (dolist (action (actions *machine*))
           (let ((func-name (format nil "~a~a"
                                    (sym->camelcase action)
-                                   (sym->pascalcase (slot-value *machine* 'context)))))
+                                   (sym->pascalcase (context *machine*)))))
             (define-c++-fun func-name "void" "StateMachine::Completion completion"
               (wl (format nil "// TODO: add logic for ~a" func-name))
               (wl "completion(true, NULL);"))))
