@@ -188,15 +188,15 @@
   (wl)
   (define-c++-class "StateMachine"
     (define-c++-class-section "public")
-    (wl "typedef std::function<void(bool, std::exception*)> Completion;")
-    (wl)
-    (wlb "bool isLogEnabled = false;")
-
     (define-c++-doc "The states of the state machine. A state fully defines properties necessary to decide user actions.")
     (define-c++-enum "State" (get-states *machine*))
     (define-c++-doc "The actions of the state machine. An action connects two states.")
     (define-c++-enum "Action" (slot-value *machine* 'actions))
     (define-c++-enum "ErrId" *errors*)
+    (wl "typedef std::function<void(bool, std::exception*)> Completion;")
+    (wl "typedef std::function<void(Completion)> ActionExecutor;")
+    (wl "typedef std::tuple<State, Action, State> Transition;")
+    (wlb "typedef std::function<bool()> Decision;")
     (define-c++-class "Err : public std::exception"
         (define-c++-class-section "public"
           (wl "ErrId err;")
@@ -213,9 +213,7 @@
             (wl "this->message = enumNameForErrId(err) + \" \" +std::string(message);"))
           (define-c++-block "virtual const char* what() const noexcept"
             (wl "return message.c_str();"))))
-    (wl "typedef std::function<void(Completion)> ActionExecutor;")
-    (wl "typedef std::tuple<State, Action, State> Transition;")
-    (wlb "typedef std::function<bool()> Decision;")
+    (wlb "bool isLogEnabled = false;")
     (wl "static StateMachine create() {")
     (wl (format nil "  return StateMachine(~a);"
                 (state-const-sym (sym->camelcase (get-start *machine*)))))
@@ -227,7 +225,6 @@
         (wl "return std::string(rv);"))
       (wl "return \"\";"))
     (loop-decisions (decision)
-                    (wl)
                     (define-c++-doc (format nil "Set decision for ~a" (sym->decision decision)))
                     (define-c++-fun (format nil "setDecision~a" (sym->pascalcase decision)) "void"
                       "Decision decision"
@@ -235,7 +232,6 @@
     (dolist (action (slot-value *machine* 'actions))
       (let ((ap (sym->pascalcase action))
             (ac (sym->camelcase action)))
-        (wl)
         (define-c++-doc (format nil "Set action ~a" (action-const-sym ac)))
         (define-c++-fun (format nil "setAction~a" ap) "void" "ActionExecutor action"
           (wl (format nil "action~a = action;" ap)))
