@@ -360,12 +360,12 @@
                           (sym->pascalcase (slot-value *machine* 'context)))))
             (wl "sm.start();")
             (wl)
-            (wl "std::cout << \"This returns a specific exception:\" << std::endl;")
+            (wl "std::cout << \"-- This returns a specific exception:\" << std::endl;")
             (define-c++-block "sm.doActionExecuteSomething([&](bool success, std::exception& e)"
               (wl "std::cout << \"-- success:\" << success << std::endl;")
               (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
             (wl ");")
-            (wl "std::cout << \"This moves through various states:\" << std::endl;")
+            (wl "std::cout << \"-- This moves through various states:\" << std::endl;")
             (define-c++-block "sm.doActionGoToB([&](bool success, std::exception& e)"
               (wl "std::cout << \"-- success:\" << success << std::endl;"))
             (wl ");")))
