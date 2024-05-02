@@ -347,9 +347,8 @@
       (define-c++-block "if (isLogEnabled)"
           (wl "std::cout << \"StateMachine: \" << msg << std::endl;")))))
 
-(defun gen-usage-stream ()
-  ;; TODO(mihai): don't hardcode header
-  (wl "#include \"Machine.hpp\"")
+(defun gen-usage-stream (path-code)
+  (wl (format nil "#include \"~a\"" (file-name path-code)))
   (wl)
   (define-c++-class "StateMachineTest"
       (define-c++-class-section "public"
@@ -389,19 +388,13 @@
     (wl "StateMachineTest().test();")
     (wl "return 0;")))
 
-(defun gen-code ()
-  (with-output-to-string (*stream*)
-    (gen-code-stream)))
-
-(defun gen-usage ()
-  (with-output-to-string (*stream*)
-    (gen-usage-stream)))
-
 (defun save-and-check-c++ (machine path-code path-usage)
   (format t "~&Generating code…~%")
   (let* ((*machine* machine)
-         (code (gen-code))
-         (code-usage (gen-usage)))
+         (code (with-output-to-string (*stream*)
+                 (gen-code-stream)))
+         (code-usage (with-output-to-string (*stream*)
+                       (gen-usage-stream path-code))))
     (with-open-file (f path-code :direction :output :if-exists :supersede)
       (write-string code f))
     (with-open-file (f path-usage :direction :output :if-exists :supersede)

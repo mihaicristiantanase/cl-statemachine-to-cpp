@@ -6,7 +6,7 @@
   :license  "Specify license here"
   :version "0.9"
   :serial t
-  :depends-on (:shell :cl-change-case)
+  :depends-on (:shell :cl-change-case :pathname-utils)
   :components ((:file "package")
                (:file "utils")
                (:file "cl-statemachine-to-c++")))
