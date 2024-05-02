@@ -18,7 +18,7 @@
     :reader transitions
     :initform nil)
    (actions
-    :reader actions
+    :accessor actions
     :initform nil)))
 
 (defparameter *machine* nil)
