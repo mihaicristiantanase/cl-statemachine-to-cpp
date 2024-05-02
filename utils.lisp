@@ -13,6 +13,8 @@
 
 (defun do-shell (cmd)
   "Documentation for do-shell with parameters cmd"
+  (format t "~&$ ~a~%" cmd)
+
   (multiple-value-bind (_ __ status)
       (uiop:run-program cmd
                         :ignore-error-status t
