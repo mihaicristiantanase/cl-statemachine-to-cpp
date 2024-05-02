@@ -1,7 +1,6 @@
 ;;;; cl-statemachine-to-c++.lisp
 
 ;;; TODO: beautify code (ex: join "else", "catch" lines)
-;;; TODO: remove trailing white spaces
 ;;; TODO: cleanup common lisp code
 
 (in-package #:cl-statemachine-to-c++)
@@ -63,7 +62,8 @@
 
 (defun wl (&optional (fmt "") &rest body)
   "Write line"
-  (format *stream* (make-string *indent* :initial-element #\Space))
+  (when (> (length fmt) 0)
+      (format *stream* (make-string *indent* :initial-element #\Space)))
   (apply #'format *stream* fmt body)
   (format *stream* "~%"))
 
