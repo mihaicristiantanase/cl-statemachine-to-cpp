@@ -244,6 +244,15 @@
         (define-c++-fun (format nil "doAction~a" ap) "void" "Completion completion"
           (wl (format nil "log(\"doAction~a\");" ap))
           (wl (format nil "doAction(~a, completion);" (action-const-sym ac))))))
+    (define-c++-doc "Inspect the current state.")
+    (define-c++-fun "getState" "State" ""
+      (wl "return state;"))
+    (define-c++-doc "Inspect the last action executed.")
+    (define-c++-fun "getLastAction" "Action" ""
+      (wl "return lastAction;"))
+    (define-c++-doc "Inspect the last action error.")
+    (define-c++-fun "getLastActionError" "std::exception*" ""
+      (wl "return lastActionError;"))
     (define-c++-doc "Start method. Must be called, otherwise, the state machine is not running.")
     (define-c++-fun "start" "void" ""
       (wl "// check decisions")
