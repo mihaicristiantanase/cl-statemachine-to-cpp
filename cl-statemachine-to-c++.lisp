@@ -206,11 +206,13 @@
           (wl)
           (define-c++-block "Err() : err(kErrIdSuccess)")
           (define-c++-block "Err(ErrId err, State state, Action action) : err(err)"
-            (wl "this->message = \"state:\" + enumNameForState(state) + \" action:\" + enumNameForAction(action);"))
+            (wl "this->message = enumNameForErrId(err) +")
+            (wl "\" state:\" + enumNameForState(state) +")
+            (wl "\" action:\" + enumNameForAction(action);"))
           (define-c++-block "Err(std::string message) : err(kErrIdGeneralError)"
-            (wl "this->message = message;"))
+            (wl "this->message = enumNameForErrId(err) + \" \" + message;"))
           (define-c++-block "Err(const char* message) : err(kErrIdGeneralError)"
-            (wl "this->message = std::string(message);"))
+            (wl "this->message = enumNameForErrId(err) + \" \" +std::string(message);"))
           (define-c++-block "virtual const char* what() const noexcept"
             (wl "return message.c_str();"))))
     (wl "typedef std::function<void(Completion)> ActionExecutor;")
@@ -279,7 +281,7 @@
       (wl "// check actions")
       (dolist (action (slot-value *machine* 'actions))
         (define-c++-block (format nil "if (!action~a)" (sym->pascalcase action))
-          (wl (format nil "throw std::invalid_argument(\"Machine not started because action '~a' is missing\");"
+          (wl (format nil "throw Err(\"Machine not started because action '~a' is missing\");"
                       (sym->camelcase action)))))
       (wl)
       (wl "// start the machine")
