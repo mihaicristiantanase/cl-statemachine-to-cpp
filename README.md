@@ -48,7 +48,7 @@ From the  following BMPN diagram:
   "/tmp/MachineTest.cpp")
 ```
 
-* generates the main state machine file at `/tmp/StateMachine.hpp`:
+* generates the main state machine file at `/tmp/Machine.hpp`:
 
 ```c++
 //
@@ -62,7 +62,6 @@ From the  following BMPN diagram:
 
 class StateMachine {
 public:
-  typedef std::function<void(bool, std::exception&)> Completion;
   /**
    * The states of the state machine. A state fully defines properties necessary to decide user actions.
    */
@@ -153,6 +152,11 @@ public:
 
   };
 
+  typedef std::function<void(bool, std::exception*)> Completion;
+  typedef std::function<void(Completion)> ActionExecutor;
+  typedef std::tuple<State, Action, State> Transition;
+  typedef std::function<bool()> Decision;
+
   class Err : public std::exception {
   public:
     ErrId err;
@@ -162,67 +166,26 @@ public:
     }
 
     Err(ErrId err, State state, Action action) : err(err) {
-      this->message = "state:" + enumNameForState(state) + " action:" + enumNameForAction(action);
+      this->message = enumNameForErrId(err) +
+      " state:" + enumNameForState(state) +
+      " action:" + enumNameForAction(action);
     }
 
     Err(std::string message) : err(kErrIdGeneralError) {
-      this->message = message;
+      this->message = enumNameForErrId(err) + " " + message;
+    }
+
+    Err(const char* message) : err(kErrIdGeneralError) {
+      this->message = enumNameForErrId(err) + " " +std::string(message);
+    }
+
+    virtual const char* what() const noexcept {
+      return message.c_str();
     }
 
   };
 
-  typedef std::function<void(Completion)> ActionExecutor;
-  typedef std::tuple<State, Action, State> Transition;
-  typedef std::function<bool()> Decision;
-
-  /**
-   * Flag to indicate whether or not this class prints debugging messages.
-   */
   bool isLogEnabled = false;
-
-  /**
-   * Current state.
-   */
-  State state;
-
-  /**
-   * Last action.
-   */
-  Action lastAction;
-
-  /**
-   * Last action error.
-   */
-  Err lastActionError;
-
-  /**
-   * Actions
-   */
-  ActionExecutor actionExecuteSomething;
-  ActionExecutor actionGoToA;
-  ActionExecutor actionGoToB;
-  ActionExecutor actionGoToF;
-  ActionExecutor actionGoToG;
-
-  /**
-   * Decisions
-   */
-  Decision isFlagA;
-  Decision isFlagB;
-  Decision isFlagC;
-  Decision isFlagC1;
-  Decision isFlagC2;
-
-  /**
-   * Transitions
-   */
-  Transition transitions[5] = {
-    {kStateD, kActionGoToG, kStateG},
-    {kStateG, kActionGoToA, kStateA},
-    {kStateG, kActionExecuteSomething, kStateG},
-    {kStateA, kActionGoToB, kStateB},
-    {kStateE, kActionGoToF, kStateF},
-  };
 
   static StateMachine create() {
     return StateMachine(kStateADecision);
@@ -232,13 +195,13 @@ public:
    * Description of the error from last action.
    */
   std::string errorDescription() {
-    if (lastActionError.err != kErrIdSuccess) {
-      return lastActionError.message;
+    if (lastActionError) {
+      const char* rv = lastActionError->what();
+      return std::string(rv);
     }
 
     return "";
   }
-
 
   /**
    * Set decision for isFlagA
@@ -247,14 +210,12 @@ public:
     isFlagA = decision;
   }
 
-
   /**
    * Set decision for isFlagB
    */
   void setDecisionFlagB(Decision decision) {
     isFlagB = decision;
   }
-
 
   /**
    * Set decision for isFlagC
@@ -263,7 +224,6 @@ public:
     isFlagC = decision;
   }
 
-
   /**
    * Set decision for isFlagC1
    */
@@ -271,14 +231,12 @@ public:
     isFlagC1 = decision;
   }
 
-
   /**
    * Set decision for isFlagC2
    */
   void setDecisionFlagC2(Decision decision) {
     isFlagC2 = decision;
   }
-
 
   /**
    * Set action kActionExecuteSomething
@@ -295,7 +253,6 @@ public:
     doAction(kActionExecuteSomething, completion);
   }
 
-
   /**
    * Set action kActionGoToA
    */
@@ -310,7 +267,6 @@ public:
     log("doActionGoToA");
     doAction(kActionGoToA, completion);
   }
-
 
   /**
    * Set action kActionGoToB
@@ -327,7 +283,6 @@ public:
     doAction(kActionGoToB, completion);
   }
 
-
   /**
    * Set action kActionGoToF
    */
@@ -343,7 +298,6 @@ public:
     doAction(kActionGoToF, completion);
   }
 
-
   /**
    * Set action kActionGoToG
    */
@@ -357,6 +311,27 @@ public:
   void doActionGoToG(Completion completion) {
     log("doActionGoToG");
     doAction(kActionGoToG, completion);
+  }
+
+  /**
+   * Inspect the current state.
+   */
+  State getState() {
+    return state;
+  }
+
+  /**
+   * Inspect the last action executed.
+   */
+  Action getLastAction() {
+    return lastAction;
+  }
+
+  /**
+   * Inspect the last action error.
+   */
+  std::exception* getLastActionError() {
+    return lastActionError;
   }
 
   /**
@@ -387,23 +362,23 @@ public:
 
     // check actions
     if (!actionExecuteSomething) {
-      throw std::invalid_argument("Machine not started because action 'executeSomething' is missing");
+      throw Err("Machine not started because action 'executeSomething' is missing");
     }
 
     if (!actionGoToA) {
-      throw std::invalid_argument("Machine not started because action 'goToA' is missing");
+      throw Err("Machine not started because action 'goToA' is missing");
     }
 
     if (!actionGoToB) {
-      throw std::invalid_argument("Machine not started because action 'goToB' is missing");
+      throw Err("Machine not started because action 'goToB' is missing");
     }
 
     if (!actionGoToF) {
-      throw std::invalid_argument("Machine not started because action 'goToF' is missing");
+      throw Err("Machine not started because action 'goToF' is missing");
     }
 
     if (!actionGoToG) {
-      throw std::invalid_argument("Machine not started because action 'goToG' is missing");
+      throw Err("Machine not started because action 'goToG' is missing");
     }
 
 
@@ -417,6 +392,54 @@ public:
     }
 
   }
+
+private:
+  /**
+   * Flag to indicate whether or not this class prints debugging messages.
+   */
+  /**
+   * Current state.
+   */
+  State state;
+
+  /**
+   * Last action.
+   */
+  Action lastAction;
+
+  /**
+   * Last action error.
+   */
+  std::exception* lastActionError = NULL;
+
+  /**
+   * Actions
+   */
+  ActionExecutor actionExecuteSomething;
+  ActionExecutor actionGoToA;
+  ActionExecutor actionGoToB;
+  ActionExecutor actionGoToF;
+  ActionExecutor actionGoToG;
+
+  /**
+   * Decisions
+   */
+  Decision isFlagA;
+  Decision isFlagB;
+  Decision isFlagC;
+  Decision isFlagC1;
+  Decision isFlagC2;
+
+  /**
+   * Transitions
+   */
+  Transition transitions[5] = {
+    {kStateD, kActionGoToG, kStateG},
+    {kStateG, kActionGoToA, kStateA},
+    {kStateG, kActionExecuteSomething, kStateG},
+    {kStateA, kActionGoToB, kStateB},
+    {kStateE, kActionGoToF, kStateF},
+  };
 
   StateMachine(State state) {
     this->state = state;
@@ -449,28 +472,28 @@ public:
       if (!actionExec) {
         throw Err(kErrIdTransitionNotSet, state, action);
       }
-      actionExec([&](bool success, std::exception& e) {
+      actionExec([&](bool success, std::exception* actionException) {
         if (!success) {
-          lastActionError = Err(e.what());
-          completion(false, e);
+          lastActionError = actionException;
+          completion(false, actionException);
           return;
         }
 
         try {
           moveToState(std::get<2>(transition));
-          lastActionError = Err(e.what());
-          completion(success, e);
+          lastActionError = actionException;
+          completion(success, actionException);
         } catch (std::exception& e) {
-          lastActionError = Err(e.what());
-          completion(false, e);
+          lastActionError = &e;
+          completion(false, &e);
         }
 
       }
 
       );
     } catch (std::exception& e) {
-      lastActionError = Err(e.what());
-      completion(false, e);
+      lastActionError = &e;
+      completion(false, &e);
     }
 
   }
@@ -570,15 +593,15 @@ public:
     sm.setActionGoToG([&](StateMachine::Completion completion) { goToGDemoEx(completion); });
     sm.start();
 
-    std::cout << "This returns a specific exception:" << std::endl;
-    sm.doActionExecuteSomething([&](bool success, std::exception& e) {
+    std::cout << "-- This returns a specific exception:" << std::endl;
+    sm.doActionExecuteSomething([&](bool success, std::exception* e) {
       std::cout << "-- success:" << success << std::endl;
-      std::cout << "-- error: " << sm.errorDescription() << std::endl;
+      std::cout << "-- error:" << sm.errorDescription() << std::endl;
     }
 
     );
-    std::cout << "This moves through various states:" << std::endl;
-    sm.doActionGoToB([&](bool success, std::exception& e) {
+    std::cout << "-- This moves through various states:" << std::endl;
+    sm.doActionGoToB([&](bool success, std::exception* e) {
       std::cout << "-- success:" << success << std::endl;
     }
 
@@ -588,32 +611,27 @@ public:
 private:
   void executeSomethingDemoEx(StateMachine::Completion completion) {
     // TODO: add logic for executeSomethingDemoEx
-    auto e = std::exception();
-    completion(true, e);
+    completion(true, NULL);
   }
 
   void goToADemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToADemoEx
-    auto e = std::exception();
-    completion(true, e);
+    completion(true, NULL);
   }
 
   void goToBDemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToBDemoEx
-    auto e = std::exception();
-    completion(true, e);
+    completion(true, NULL);
   }
 
   void goToFDemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToFDemoEx
-    auto e = std::exception();
-    completion(true, e);
+    completion(true, NULL);
   }
 
   void goToGDemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToGDemoEx
-    auto e = std::exception();
-    completion(true, e);
+    completion(true, NULL);
   }
 
   bool tautology() {
