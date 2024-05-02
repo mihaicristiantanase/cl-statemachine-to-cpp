@@ -3,7 +3,6 @@
 ;;; TODO: beautify code (ex: join "else", "catch" lines)
 ;;; TODO: remove trailing white spaces
 ;;; TODO: cleanup common lisp code
-;; TODO(mihai): fix auto e = std::exception() hack
 
 (in-package #:cl-statemachine-to-c++)
 
@@ -189,7 +188,7 @@
   (wl)
   (define-c++-class "StateMachine"
     (define-c++-class-section "public"
-      (wl "typedef std::function<void(bool, std::exception&)> Completion;"))
+      (wl "typedef std::function<void(bool, std::exception*)> Completion;"))
 
     ;; TODO(mihai): separate sections
     ;; (define-c++-class-section "private")
@@ -308,20 +307,20 @@
            (wl "if (!actionExec) {")
            (wl "  throw Err(kErrIdTransitionNotSet, state, action);")
            (wl "}")
-           (define-c++-block "actionExec([&](bool success, std::exception& e)"
+           (define-c++-block "actionExec([&](bool success, std::exception* actionException)"
                (define-c++-block "if (!success)"
-                 (wl "lastActionError = &e;")
-                 (wl "completion(false, e);")
+                 (wl "lastActionError = actionException;")
+                 (wl "completion(false, actionException);")
                  (wl "return;"))
              (define-c++-try
                  ((wl "moveToState(std::get<2>(transition));")
-                  (wl "lastActionError = &e;")
-                  (wl "completion(success, e);"))
+                  (wl "lastActionError = actionException;")
+                  (wl "completion(success, actionException);"))
                  ((wl "lastActionError = &e;")
-                  (wl "completion(false, e);"))))
+                  (wl "completion(false, &e);"))))
            (wl ");"))
           ((wl "lastActionError = &e;")
-           (wl "completion(false, e);"))))
+           (wl "completion(false, &e);"))))
     (define-c++-fun "findTransition" "Transition" "Action action"
       (define-c++-block "for (auto cand : transitions)"
           (wl "if (std::get<0>(cand) == state && std::get<1>(cand) == action) {")
@@ -368,12 +367,12 @@
             (wl "sm.start();")
             (wl)
             (wl "std::cout << \"-- This returns a specific exception:\" << std::endl;")
-            (define-c++-block "sm.doActionExecuteSomething([&](bool success, std::exception& e)"
+            (define-c++-block "sm.doActionExecuteSomething([&](bool success, std::exception* e)"
               (wl "std::cout << \"-- success:\" << success << std::endl;")
               (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
             (wl ");")
             (wl "std::cout << \"-- This moves through various states:\" << std::endl;")
-            (define-c++-block "sm.doActionGoToB([&](bool success, std::exception& e)"
+            (define-c++-block "sm.doActionGoToB([&](bool success, std::exception* e)"
               (wl "std::cout << \"-- success:\" << success << std::endl;"))
             (wl ");")))
     (define-c++-class-section "private"
@@ -383,8 +382,7 @@
                                    (sym->pascalcase (slot-value *machine* 'context)))))
             (define-c++-fun func-name "void" "StateMachine::Completion completion"
               (wl (format nil "// TODO: add logic for ~a" func-name))
-              (wl "auto e = std::exception();")
-              (wl "completion(true, e);"))))
+              (wl "completion(true, NULL);"))))
       (define-c++-fun "tautology" "bool" ""
         (wl "return true;"))))
   (define-c++-fun "main" "int" "int argc, char** argv"
