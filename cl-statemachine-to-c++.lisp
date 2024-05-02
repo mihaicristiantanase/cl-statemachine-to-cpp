@@ -208,7 +208,11 @@
           (define-c++-block "Err(ErrId err, State state, Action action) : err(err)"
             (wl "this->message = \"state:\" + enumNameForState(state) + \" action:\" + enumNameForAction(action);"))
           (define-c++-block "Err(std::string message) : err(kErrIdGeneralError)"
-            (wl "this->message = message;"))))
+            (wl "this->message = message;"))
+          (define-c++-block "Err(const char* message) : err(kErrIdGeneralError)"
+            (wl "this->message = std::string(message);"))
+          (define-c++-block "virtual const char* what() const noexcept"
+            (wl "return message.c_str();"))))
     (wl "typedef std::function<void(Completion)> ActionExecutor;")
     (wl "typedef std::tuple<State, Action, State> Transition;")
     (wlb "typedef std::function<bool()> Decision;")
@@ -219,7 +223,7 @@
     (define-c++-doc "Last action.")
     (wlb "Action lastAction;")
     (define-c++-doc "Last action error.")
-    (wlb "Err lastActionError;")
+    (wlb "std::exception* lastActionError = NULL;")
     (define-c++-doc "Actions")
     (dolist (action (slot-value *machine* 'actions))
       (wl "ActionExecutor action~a;" (sym->pascalcase action)))
@@ -242,8 +246,9 @@
     (wlb "}")
     (define-c++-doc "Description of the error from last action.")
     (define-c++-fun "errorDescription" "std::string" ""
-        (define-c++-block (format nil "if (lastActionError.err != ~a)" (err-const-sym "success"))
-          (wl "return lastActionError.message;"))
+      (define-c++-block "if (lastActionError)"
+        (wl "const char* rv = lastActionError->what();")
+        (wl "return std::string(rv);"))
       (wl "return \"\";"))
     (loop-decisions (decision)
                     (wl)
@@ -303,17 +308,17 @@
            (wl "}")
            (define-c++-block "actionExec([&](bool success, std::exception& e)"
                (define-c++-block "if (!success)"
-                   (wl "lastActionError = Err(e.what());")
+                 (wl "lastActionError = &e;")
                  (wl "completion(false, e);")
                  (wl "return;"))
              (define-c++-try
                  ((wl "moveToState(std::get<2>(transition));")
-                  (wl "lastActionError = Err(e.what());")
+                  (wl "lastActionError = &e;")
                   (wl "completion(success, e);"))
-                 ((wl "lastActionError = Err(e.what());")
+                 ((wl "lastActionError = &e;")
                   (wl "completion(false, e);"))))
            (wl ");"))
-          ((wl "lastActionError = Err(e.what());")
+          ((wl "lastActionError = &e;")
            (wl "completion(false, e);"))))
     (define-c++-fun "findTransition" "Transition" "Action action"
       (define-c++-block "for (auto cand : transitions)"
