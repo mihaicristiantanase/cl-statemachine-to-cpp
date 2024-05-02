@@ -120,7 +120,8 @@
   `(progn
      (let ((*indent* (- *indent* 2)))
        (wl (s+ ,section-name ":")))
-     ,@body))
+     ,@body
+     (wl)))
 
 (defmacro define-c++-try (try-block catch-block)
   `(progn
