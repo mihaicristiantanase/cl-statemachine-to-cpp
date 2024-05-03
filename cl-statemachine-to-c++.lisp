@@ -55,6 +55,15 @@
     (let ((bad-states (set-difference (transitive-states machine) states)))
       (when bad-states
         (error "Found transitive states ~a that are not defined as states" bad-states)))
+    (let ((bad-states
+            (remove-if #'(lambda (item) (= (length (cdr item)) 1))
+                       (mapcar #'(lambda (s)
+                                   (cons s (remove-if-not #'(lambda (item) (eq s item))
+                                                          (transitions machine)
+                                                          :key #'car)))
+                               (transitive-states machine)))))
+      (when bad-states
+        (error "Found transitive states ~a with more than one transition" bad-states)))
     ;; validate states in transitions
     (let ((bad-states (set-difference
                        (apply #'append (mapcar
