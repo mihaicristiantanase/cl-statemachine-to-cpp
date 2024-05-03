@@ -268,8 +268,6 @@
         (define-c++-doc (format nil "Execute action ~a from current state"
                                 (action-const-sym ac)))
         (define-c++-fun (format nil "doAction~a" ap) "void" "Completion completion"
-          ;; TODO(mihai): move log to some other place
-          (wl (format nil "log(\"doAction~a\");" ap))
           (wl (format nil "doAction(~a, completion);" (action-const-sym ac))))))
     (define-c++-doc "Inspect the current state.")
     (define-c++-fun "getState" "State" ""
@@ -328,6 +326,7 @@
     (wl "  this->state = state;")
     (wlb "}")
     (define-c++-fun "doAction" "void " "Action action, Completion completion"
+      (wl "log(\"doAction \" + enumNameForAction(action));")
       (wl "lastAction = action;")
       (wl)
       (wl "ActionExecutor actionExec;")
