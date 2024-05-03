@@ -13,6 +13,10 @@
     :initarg :states
     :reader states
     :initform nil)
+   (transitive-states
+    :initarg :transitive-states
+    :reader transitive-states
+    :initform nil)
    (transitions
     :initarg :transitions
     :reader transitions
@@ -29,13 +33,17 @@
     transition-not-set
     invalid-transition
     invalid-decision
+    no-actions-for-state
     general-error))
 
 (defparameter *indent* 0)
 (defparameter *stream* nil)
 
-(defun stable-state (state machine)
-  (not (null (find state (states machine)))))
+(defun decision-state-p (state machine)
+  (null (find state (states machine))))
+
+(defun transitive-state-p (state machine)
+  (find state (transitive-states machine)))
 
 (defgeneric get-start (machine))
 (defgeneric get-states (machine))
@@ -43,6 +51,10 @@
 
 (defmethod initialize-instance :after ((machine Machine) &key)
   (let ((states (mapcar #'(lambda (s) (if (consp s) (car s) s)) (states machine))))
+    ;; validate transitive states
+    (let ((bad-states (set-difference (transitive-states machine) states)))
+      (when bad-states
+        (error "Found transitive states ~a that are not defined as states" bad-states)))
     ;; validate states in transitions
     (let ((bad-states (set-difference
                        (apply #'append (mapcar
@@ -183,7 +195,7 @@
   (let ((v (gensym)))
     `(let (,v)
        (dolist (state (get-states *machine*))
-         (unless (stable-state state *machine*)
+         (when (decision-state-p state *machine*)
            (loop for ,varname in (get-unstable-state-decisions state *machine*)
                  when (listp ,varname) do
                    (let ((,varname (car ,varname)))
@@ -208,6 +220,7 @@
     (define-c++-doc "The actions of the state machine. An action connects two states.")
     (define-c++-enum "Action" (actions *machine*))
     (define-c++-enum "ErrId" *errors*)
+    ;; TODO(mihai): remove exception from Completion type
     (wl "typedef std::function<void(bool, std::exception*)> Completion;")
     (wl "typedef std::function<void(Completion)> ActionExecutor;")
     (wl "typedef std::tuple<State, Action, State> Transition;")
@@ -222,6 +235,9 @@
             (wl "this->message = enumNameForErrId(err) +")
             (wl "\" state:\" + enumNameForState(state) +")
             (wl "\" action:\" + enumNameForAction(action);"))
+          (define-c++-block "Err(ErrId err, State state) : err(err)"
+            (wl "this->message = enumNameForErrId(err) +")
+            (wl "\" state:\" + enumNameForState(state);"))
           (define-c++-block "Err(std::string message) : err(kErrIdGeneralError)"
             (wl "this->message = enumNameForErrId(err) + \" \" + message;"))
           (define-c++-block "Err(const char* message) : err(kErrIdGeneralError)"
@@ -253,6 +269,7 @@
         (define-c++-doc (format nil "Execute action ~a from current state"
                                 (action-const-sym ac)))
         (define-c++-fun (format nil "doAction~a" ap) "void" "Completion completion"
+          ;; TODO(mihai): move log to some other place
           (wl (format nil "log(\"doAction~a\");" ap))
           (wl (format nil "doAction(~a, completion);" (action-const-sym ac))))))
     (define-c++-doc "Inspect the current state.")
@@ -280,7 +297,7 @@
       (wl)
       (wl "// start the machine")
       (define-c++-block "try"
-          (wl "moveToState(state);"))
+          (wl "moveToState(state, [](bool,std::exception*){});"))
       (define-c++-block "catch (std::exception& e)"
           (wl "throw std::runtime_error(e.what());")))
 
@@ -333,9 +350,8 @@
                  (wl "completion(false, actionException);")
                  (wl "return;"))
              (define-c++-try
-                 ((wl "moveToState(std::get<2>(transition));")
-                  (wl "lastActionError = actionException;")
-                  (wl "completion(success, actionException);"))
+                 ((wl "lastActionError = actionException;")
+                  (wl "moveToState(std::get<2>(transition), completion);"))
                  ((wl "lastActionError = &e;")
                   (wl "completion(false, &e);"))))
            (wl ");"))
@@ -347,21 +363,33 @@
         (wl "  return cand;")
         (wl "}"))
         (wl "throw Err(kErrIdImpossibleAction, state, action);"))
-    (define-c++-fun "moveToState" "void" "State state"
+    (define-c++-fun "getOnePossibleAction" "Action" "State state"
+      (define-c++-block "for (auto cand : transitions)"
+        (wl "if (std::get<0>(cand) == state) {")
+        (wl "  return std::get<1>(cand);")
+        (wl "}"))
+      (wl "throw Err(kErrIdNoActionsForState, state);"))
+    (define-c++-fun "moveToState" "void" "State state, Completion completion"
       (wl "this->state = state;")
       (wlb "log(\"moveToState \" + enumNameForState(state));")
       (define-c++-block "switch (state)"
           (dolist (state (get-states *machine*))
             (wl (format nil "case ~a:" (state-const-sym (sym->camelcase state))))
-            (unless (stable-state state *machine*)
-              (loop for decision in (get-unstable-state-decisions state *machine*)
-                    for i from 0 do
-                      (if (listp decision)
-                          (let ((sd (sym->decision (car decision))))
-                            (define-c++-block (format nil "~:[~;else ~]if (~a())" (> i 0) sd)
-                              (wl (format nil "moveToState(~a);" (state-const-sym (sym->camelcase (cdr decision)))))))
-                          (define-c++-block "else"
-                            (wl (format nil "moveToState(~a);" (state-const-sym (sym->camelcase decision))))))))
+            (cond ((decision-state-p state *machine*)
+                   (loop for decision in (get-unstable-state-decisions state *machine*)
+                         for i from 0 do
+                           (if (listp decision)
+                               (let ((sd (sym->decision (car decision))))
+                                 (define-c++-block (format nil "~:[~;else ~]if (~a())" (> i 0) sd)
+                                     (wl (format nil "moveToState(~a, completion);"
+                                                 (state-const-sym (sym->camelcase (cdr decision)))))))
+                               (define-c++-block "else"
+                                   (wl (format nil "moveToState(~a, completion);"
+                                               (state-const-sym (sym->camelcase decision))))))))
+                  ((transitive-state-p state *machine*)
+                   (wl "doAction(getOnePossibleAction(~a), completion);"
+                       (state-const-sym (sym->camelcase state))))
+                  (t (wl "completion(true, NULL);")))
             (wl "break;"))))
     (define-c++-fun "log" "void" "std::string msg"
       (define-c++-block "if (isLogEnabled)"
@@ -376,7 +404,7 @@
             (wl "StateMachine sm = StateMachine::create();")
             (wl "sm.isLogEnabled = true;")
             (loop-decisions (decision)
-                            (wl (format nil "sm.setDecision~a([&]() { /*TODO*/ return tautology(); });"
+                            (wl (format nil "sm.setDecision~a([&]() { /*TODO*/ return falsity(); });"
                                         (sym->pascalcase decision))))
             (dolist (action (actions *machine*))
               (wl (format nil "sm.setAction~a([&](StateMachine::Completion completion) { ~a~a(completion); });"
@@ -386,7 +414,7 @@
             (wl "sm.start();")
             (wl)
             (wl "std::cout << \"-- This returns a specific exception:\" << std::endl;")
-            (define-c++-block "sm.doActionExecuteSomething([&](bool success, std::exception* e)"
+            (define-c++-block "sm.doActionGoToG([&](bool success, std::exception* e)"
               (wl "std::cout << \"-- success:\" << success << std::endl;")
               (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
             (wl ");")
@@ -402,8 +430,8 @@
             (define-c++-fun func-name "void" "StateMachine::Completion completion"
               (wl (format nil "// TODO: add logic for ~a" func-name))
               (wl "completion(true, NULL);"))))
-      (define-c++-fun "tautology" "bool" ""
-        (wl "return true;"))))
+      (define-c++-fun "falsity" "bool" ""
+        (wl "return false;"))))
   (define-c++-fun "main" "int" "int argc, char** argv"
     (wl "StateMachineTest().test();")
     (wl "return 0;")))

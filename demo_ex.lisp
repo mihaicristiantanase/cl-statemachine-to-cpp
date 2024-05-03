@@ -16,9 +16,9 @@
              e
              f
              g)
+   :transitive-states '(d g)
    :transitions '((d go-to-g g)
                   (g go-to-a a)
-                  (g execute-something nil)
                   (a go-to-b b)
                   (e go-to-f f))))
 
