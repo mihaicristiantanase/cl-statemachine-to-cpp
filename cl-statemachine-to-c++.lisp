@@ -2,6 +2,13 @@
 
 ;;; TODO: beautify code (ex: join "else", "catch" lines)
 ;;; TODO: cleanup common lisp code
+;; TODO(mihai): make decision states consistent by putting the various
+;;  branches into transitions
+;;  (c-decision . ((flag-c1 . e) (flag-c2 . f) g)) →
+;;    in states (c-decision)
+;;    in transitions (c-decision flag-c1 e)
+;;                   (c-decision flag-c2 f)
+;;                   (c-decision t g)
 
 (in-package #:cl-statemachine-to-c++)
 
