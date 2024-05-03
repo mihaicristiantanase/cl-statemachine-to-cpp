@@ -410,12 +410,12 @@
             (wl "sm.start();")
             (wl)
             (wl "std::cout << \"-- This returns a specific exception:\" << std::endl;")
-            (define-c++-block "sm.doActionGoToG([&](bool success)"
+            (define-c++-block "sm.doActionGoToF([&](bool success)"
               (wl "std::cout << \"-- success:\" << success << std::endl;")
               (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
             (wl ");")
             (wl "std::cout << \"-- This moves through various states:\" << std::endl;")
-            (define-c++-block "sm.doActionGoToB([&](bool success)"
+            (define-c++-block "sm.doActionGoToG([&](bool success)"
               (wl "std::cout << \"-- success:\" << success << std::endl;"))
             (wl ");")))
     (define-c++-class-section "private"

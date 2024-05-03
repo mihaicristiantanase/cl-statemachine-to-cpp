@@ -16,7 +16,7 @@
              e
              f
              g)
-   :transitive-states '(d g)
+   :transitive-states '(a g)
    :transitions '((d go-to-g g)
                   (g go-to-a a)
                   (a go-to-b b)
