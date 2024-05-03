@@ -29,17 +29,14 @@ From the  following BMPN diagram:
               d)
              a
              b
-             (c-decision
-              (flag-c1 . e)
-              (flag-c2 . f)
-              g)
+             (c-decision . ((flag-c1 . e) (flag-c2 . f) g))
              d
              e
              f
              g)
+   :transitive-states '(a g)
    :transitions '((d go-to-g g)
                   (g go-to-a a)
-                  (g execute-something nil)
                   (a go-to-b b)
                   (e go-to-f f))))
 
@@ -102,7 +99,6 @@ public:
    * The actions of the state machine. An action connects two states.
    */
   enum Action {
-      kActionExecuteSomething,
       kActionGoToA,
       kActionGoToB,
       kActionGoToF,
@@ -111,8 +107,6 @@ public:
 
   static std::string enumNameForAction(Action item) {
     switch (item) {
-      case kActionExecuteSomething:
-      return "Action.kActionExecuteSomething";
       case kActionGoToA:
       return "Action.kActionGoToA";
       case kActionGoToB:
@@ -131,6 +125,7 @@ public:
       kErrIdTransitionNotSet,
       kErrIdInvalidTransition,
       kErrIdInvalidDecision,
+      kErrIdNoActionsForState,
       kErrIdGeneralError,
   };
 
@@ -146,13 +141,15 @@ public:
       return "ErrId.kErrIdInvalidTransition";
       case kErrIdInvalidDecision:
       return "ErrId.kErrIdInvalidDecision";
+      case kErrIdNoActionsForState:
+      return "ErrId.kErrIdNoActionsForState";
       case kErrIdGeneralError:
       return "ErrId.kErrIdGeneralError";
     }
 
   };
 
-  typedef std::function<void(bool, std::exception*)> Completion;
+  typedef std::function<void(bool)> Completion;
   typedef std::function<void(Completion)> ActionExecutor;
   typedef std::tuple<State, Action, State> Transition;
   typedef std::function<bool()> Decision;
@@ -169,6 +166,11 @@ public:
       this->message = enumNameForErrId(err) +
       " state:" + enumNameForState(state) +
       " action:" + enumNameForAction(action);
+    }
+
+    Err(ErrId err, State state) : err(err) {
+      this->message = enumNameForErrId(err) +
+      " state:" + enumNameForState(state);
     }
 
     Err(std::string message) : err(kErrIdGeneralError) {
@@ -239,21 +241,6 @@ public:
   }
 
   /**
-   * Set action kActionExecuteSomething
-   */
-  void setActionExecuteSomething(ActionExecutor action) {
-    actionExecuteSomething = action;
-  }
-
-  /**
-   * Execute action kActionExecuteSomething from current state
-   */
-  void doActionExecuteSomething(Completion completion) {
-    log("doActionExecuteSomething");
-    doAction(kActionExecuteSomething, completion);
-  }
-
-  /**
    * Set action kActionGoToA
    */
   void setActionGoToA(ActionExecutor action) {
@@ -264,7 +251,6 @@ public:
    * Execute action kActionGoToA from current state
    */
   void doActionGoToA(Completion completion) {
-    log("doActionGoToA");
     doAction(kActionGoToA, completion);
   }
 
@@ -279,7 +265,6 @@ public:
    * Execute action kActionGoToB from current state
    */
   void doActionGoToB(Completion completion) {
-    log("doActionGoToB");
     doAction(kActionGoToB, completion);
   }
 
@@ -294,7 +279,6 @@ public:
    * Execute action kActionGoToF from current state
    */
   void doActionGoToF(Completion completion) {
-    log("doActionGoToF");
     doAction(kActionGoToF, completion);
   }
 
@@ -309,7 +293,6 @@ public:
    * Execute action kActionGoToG from current state
    */
   void doActionGoToG(Completion completion) {
-    log("doActionGoToG");
     doAction(kActionGoToG, completion);
   }
 
@@ -361,10 +344,6 @@ public:
 
 
     // check actions
-    if (!actionExecuteSomething) {
-      throw Err("Machine not started because action 'executeSomething' is missing");
-    }
-
     if (!actionGoToA) {
       throw Err("Machine not started because action 'goToA' is missing");
     }
@@ -384,7 +363,7 @@ public:
 
     // start the machine
     try {
-      moveToState(state);
+      moveToState(state, [](bool){});
     }
 
     catch (std::exception& e) {
@@ -415,7 +394,6 @@ private:
   /**
    * Actions
    */
-  ActionExecutor actionExecuteSomething;
   ActionExecutor actionGoToA;
   ActionExecutor actionGoToB;
   ActionExecutor actionGoToF;
@@ -433,10 +411,9 @@ private:
   /**
    * Transitions
    */
-  Transition transitions[5] = {
+  Transition transitions[4] = {
     {kStateD, kActionGoToG, kStateG},
     {kStateG, kActionGoToA, kStateA},
-    {kStateG, kActionExecuteSomething, kStateG},
     {kStateA, kActionGoToB, kStateB},
     {kStateE, kActionGoToF, kStateF},
   };
@@ -446,13 +423,11 @@ private:
   }
 
   void  doAction(Action action, Completion completion) {
+    log("doAction " + enumNameForAction(action));
     lastAction = action;
 
     ActionExecutor actionExec;
     switch (action) {
-      case kActionExecuteSomething:
-      actionExec = actionExecuteSomething;
-      break;
       case kActionGoToA:
       actionExec = actionGoToA;
       break;
@@ -472,20 +447,17 @@ private:
       if (!actionExec) {
         throw Err(kErrIdTransitionNotSet, state, action);
       }
-      actionExec([&](bool success, std::exception* actionException) {
+      actionExec([&](bool success) {
         if (!success) {
-          lastActionError = actionException;
-          completion(false, actionException);
+          completion(false);
           return;
         }
 
         try {
-          moveToState(std::get<2>(transition));
-          lastActionError = actionException;
-          completion(success, actionException);
+          moveToState(std::get<2>(transition), completion);
         } catch (std::exception& e) {
           lastActionError = &e;
-          completion(false, &e);
+          completion(false);
         }
 
       }
@@ -493,7 +465,7 @@ private:
       );
     } catch (std::exception& e) {
       lastActionError = &e;
-      completion(false, &e);
+      completion(false);
     }
 
   }
@@ -508,54 +480,70 @@ private:
     throw Err(kErrIdImpossibleAction, state, action);
   }
 
-  void moveToState(State state) {
+  Action getOnePossibleAction(State state) {
+    for (auto cand : transitions) {
+      if (std::get<0>(cand) == state) {
+        return std::get<1>(cand);
+      }
+    }
+
+    throw Err(kErrIdNoActionsForState, state);
+  }
+
+  void moveToState(State state, Completion completion) {
     this->state = state;
     log("moveToState " + enumNameForState(state));
 
     switch (state) {
       case kStateADecision:
       if (isFlagA()) {
-        moveToState(kStateA);
+        moveToState(kStateA, completion);
       }
 
       else if (isFlagB()) {
-        moveToState(kStateB);
+        moveToState(kStateB, completion);
       }
 
       else if (isFlagC()) {
-        moveToState(kStateCDecision);
+        moveToState(kStateCDecision, completion);
       }
 
       else {
-        moveToState(kStateD);
+        moveToState(kStateD, completion);
       }
 
       break;
       case kStateA:
+      doAction(getOnePossibleAction(kStateA), completion);
       break;
       case kStateB:
+      completion(true);
       break;
       case kStateCDecision:
       if (isFlagC1()) {
-        moveToState(kStateE);
+        moveToState(kStateE, completion);
       }
 
       else if (isFlagC2()) {
-        moveToState(kStateF);
+        moveToState(kStateF, completion);
       }
 
       else {
-        moveToState(kStateG);
+        moveToState(kStateG, completion);
       }
 
       break;
       case kStateD:
+      completion(true);
       break;
       case kStateE:
+      completion(true);
       break;
       case kStateF:
+      completion(true);
       break;
       case kStateG:
+      doAction(getOnePossibleAction(kStateG), completion);
       break;
     }
 
@@ -581,12 +569,11 @@ public:
   void test() {
     StateMachine sm = StateMachine::create();
     sm.isLogEnabled = true;
-    sm.setDecisionFlagA([&]() { /*TODO*/ return tautology(); });
-    sm.setDecisionFlagB([&]() { /*TODO*/ return tautology(); });
-    sm.setDecisionFlagC([&]() { /*TODO*/ return tautology(); });
-    sm.setDecisionFlagC1([&]() { /*TODO*/ return tautology(); });
-    sm.setDecisionFlagC2([&]() { /*TODO*/ return tautology(); });
-    sm.setActionExecuteSomething([&](StateMachine::Completion completion) { executeSomethingDemoEx(completion); });
+    sm.setDecisionFlagA([&]() { /*TODO*/ return falsity(); });
+    sm.setDecisionFlagB([&]() { /*TODO*/ return falsity(); });
+    sm.setDecisionFlagC([&]() { /*TODO*/ return falsity(); });
+    sm.setDecisionFlagC1([&]() { /*TODO*/ return falsity(); });
+    sm.setDecisionFlagC2([&]() { /*TODO*/ return falsity(); });
     sm.setActionGoToA([&](StateMachine::Completion completion) { goToADemoEx(completion); });
     sm.setActionGoToB([&](StateMachine::Completion completion) { goToBDemoEx(completion); });
     sm.setActionGoToF([&](StateMachine::Completion completion) { goToFDemoEx(completion); });
@@ -594,14 +581,14 @@ public:
     sm.start();
 
     std::cout << "-- This returns a specific exception:" << std::endl;
-    sm.doActionExecuteSomething([&](bool success, std::exception* e) {
+    sm.doActionGoToF([&](bool success) {
       std::cout << "-- success:" << success << std::endl;
       std::cout << "-- error:" << sm.errorDescription() << std::endl;
     }
 
     );
     std::cout << "-- This moves through various states:" << std::endl;
-    sm.doActionGoToB([&](bool success, std::exception* e) {
+    sm.doActionGoToG([&](bool success) {
       std::cout << "-- success:" << success << std::endl;
     }
 
@@ -609,33 +596,32 @@ public:
   }
 
 private:
-  void executeSomethingDemoEx(StateMachine::Completion completion) {
-    // TODO: add logic for executeSomethingDemoEx
-    completion(true, NULL);
-  }
-
   void goToADemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToADemoEx
-    completion(true, NULL);
+    std::cout << "-- StateMachineTest: goToADemoEx" << std::endl;
+    completion(true);
   }
 
   void goToBDemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToBDemoEx
-    completion(true, NULL);
+    std::cout << "-- StateMachineTest: goToBDemoEx" << std::endl;
+    completion(true);
   }
 
   void goToFDemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToFDemoEx
-    completion(true, NULL);
+    std::cout << "-- StateMachineTest: goToFDemoEx" << std::endl;
+    completion(true);
   }
 
   void goToGDemoEx(StateMachine::Completion completion) {
     // TODO: add logic for goToGDemoEx
-    completion(true, NULL);
+    std::cout << "-- StateMachineTest: goToGDemoEx" << std::endl;
+    completion(true);
   }
 
-  bool tautology() {
-    return true;
+  bool falsity() {
+    return false;
   }
 
 };
