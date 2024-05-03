@@ -42,12 +42,17 @@
 (defgeneric get-unstable-state-decisions (state machine))
 
 (defmethod initialize-instance :after ((machine Machine) &key)
-  ;; validate transitive states
-  (let ((bad-states (set-difference
-                     (transitive-states machine)
-                     (mapcar #'(lambda (s) (if (consp s) (car s) s)) (states machine)))))
-    (when bad-states
-      (error "Found transitive states ~a that are not defined as states" bad-states)))
+  (let ((states (mapcar #'(lambda (s) (if (consp s) (car s) s)) (states machine))))
+    ;; validate states in transitions
+    (let ((bad-states (set-difference
+                       (apply #'append (mapcar
+                                        #'(lambda (x) (append (list (car x))
+                                                              (when (caddr x) (list (caddr x)))))
+                                        (transitions machine)))
+                       states)))
+      (when bad-states
+        (error "Found states in transtions ~a that are not defined as states" bad-states))))
+  ;; fill transition to same state
   (dolist (transition (transitions machine))
     (unless (caddr transition)
       (setf (caddr transition) (car transition))))
