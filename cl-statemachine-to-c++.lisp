@@ -425,6 +425,7 @@
                                    (sym->pascalcase (context *machine*)))))
             (define-c++-fun func-name "void" "StateMachine::Completion completion"
               (wl (format nil "// TODO: add logic for ~a" func-name))
+              (wl "std::cout << \"-- StateMachineTest: ~a\" << std::endl;" func-name)
               (wl "completion(true);"))))
       (define-c++-fun "falsity" "bool" ""
         (wl "return false;"))))
