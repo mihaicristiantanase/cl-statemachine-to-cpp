@@ -220,8 +220,7 @@
     (define-c++-doc "The actions of the state machine. An action connects two states.")
     (define-c++-enum "Action" (actions *machine*))
     (define-c++-enum "ErrId" *errors*)
-    ;; TODO(mihai): remove exception from Completion type
-    (wl "typedef std::function<void(bool, std::exception*)> Completion;")
+    (wl "typedef std::function<void(bool)> Completion;")
     (wl "typedef std::function<void(Completion)> ActionExecutor;")
     (wl "typedef std::tuple<State, Action, State> Transition;")
     (wlb "typedef std::function<bool()> Decision;")
@@ -297,7 +296,7 @@
       (wl)
       (wl "// start the machine")
       (define-c++-block "try"
-          (wl "moveToState(state, [](bool,std::exception*){});"))
+          (wl "moveToState(state, [](bool){});"))
       (define-c++-block "catch (std::exception& e)"
           (wl "throw std::runtime_error(e.what());")))
 
@@ -344,19 +343,17 @@
            (wl "if (!actionExec) {")
            (wl "  throw Err(kErrIdTransitionNotSet, state, action);")
            (wl "}")
-           (define-c++-block "actionExec([&](bool success, std::exception* actionException)"
+           (define-c++-block "actionExec([&](bool success)"
                (define-c++-block "if (!success)"
-                 (wl "lastActionError = actionException;")
-                 (wl "completion(false, actionException);")
+                 (wl "completion(false);")
                  (wl "return;"))
              (define-c++-try
-                 ((wl "lastActionError = actionException;")
-                  (wl "moveToState(std::get<2>(transition), completion);"))
+                 ((wl "moveToState(std::get<2>(transition), completion);"))
                  ((wl "lastActionError = &e;")
-                  (wl "completion(false, &e);"))))
+                  (wl "completion(false);"))))
            (wl ");"))
           ((wl "lastActionError = &e;")
-           (wl "completion(false, &e);"))))
+           (wl "completion(false);"))))
     (define-c++-fun "findTransition" "Transition" "Action action"
       (define-c++-block "for (auto cand : transitions)"
           (wl "if (std::get<0>(cand) == state && std::get<1>(cand) == action) {")
@@ -389,7 +386,7 @@
                   ((transitive-state-p state *machine*)
                    (wl "doAction(getOnePossibleAction(~a), completion);"
                        (state-const-sym (sym->camelcase state))))
-                  (t (wl "completion(true, NULL);")))
+                  (t (wl "completion(true);")))
             (wl "break;"))))
     (define-c++-fun "log" "void" "std::string msg"
       (define-c++-block "if (isLogEnabled)"
@@ -414,12 +411,12 @@
             (wl "sm.start();")
             (wl)
             (wl "std::cout << \"-- This returns a specific exception:\" << std::endl;")
-            (define-c++-block "sm.doActionGoToG([&](bool success, std::exception* e)"
+            (define-c++-block "sm.doActionGoToG([&](bool success)"
               (wl "std::cout << \"-- success:\" << success << std::endl;")
               (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
             (wl ");")
             (wl "std::cout << \"-- This moves through various states:\" << std::endl;")
-            (define-c++-block "sm.doActionGoToB([&](bool success, std::exception* e)"
+            (define-c++-block "sm.doActionGoToB([&](bool success)"
               (wl "std::cout << \"-- success:\" << success << std::endl;"))
             (wl ");")))
     (define-c++-class-section "private"
@@ -429,7 +426,7 @@
                                    (sym->pascalcase (context *machine*)))))
             (define-c++-fun func-name "void" "StateMachine::Completion completion"
               (wl (format nil "// TODO: add logic for ~a" func-name))
-              (wl "completion(true, NULL);"))))
+              (wl "completion(true);"))))
       (define-c++-fun "falsity" "bool" ""
         (wl "return false;"))))
   (define-c++-fun "main" "int" "int argc, char** argv"
