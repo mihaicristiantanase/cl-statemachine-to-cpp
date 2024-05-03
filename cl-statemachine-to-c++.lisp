@@ -9,6 +9,7 @@
 ;;    in transitions (c-decision flag-c1 e)
 ;;                   (c-decision flag-c2 f)
 ;;                   (c-decision t g)
+;; TODO(mihai): fix indentation in enum
 
 (in-package #:cl-statemachine-to-c++)
 
