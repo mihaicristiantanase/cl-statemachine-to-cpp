@@ -230,223 +230,228 @@
   (wl "#include <functional>")
   (wl "#include <exception>")
   (wl)
-  (define-c++-class "StateMachine"
-    (define-c++-class-section "public")
-    (define-c++-doc "The states of the state machine. A state fully defines properties necessary to decide user actions.")
-    (define-c++-enum "State" (get-states *machine*))
-    (define-c++-doc "The actions of the state machine. An action connects two states.")
-    (define-c++-enum "Action" (actions *machine*))
-    (define-c++-enum "ErrId" *errors*)
-    (wl "typedef std::function<void(bool)> Completion;")
-    (wl "typedef std::function<void(Completion)> ActionExecutor;")
-    (wl "typedef std::tuple<State, Action, State> Transition;")
-    (wlb "typedef std::function<bool()> Decision;")
-    (define-c++-class "Err : public std::exception"
-        (define-c++-class-section "public"
-          (wl "ErrId err;")
-          (wl "std::string message;")
-          (wl)
-          (define-c++-block "Err() : err(kErrIdSuccess)")
-          (define-c++-block "Err(ErrId err, State state, Action action) : err(err)"
-            (wl "this->message = enumNameForErrId(err) +")
-            (wl "\" state:\" + enumNameForState(state) +")
-            (wl "\" action:\" + enumNameForAction(action);"))
-          (define-c++-block "Err(ErrId err, State state) : err(err)"
-            (wl "this->message = enumNameForErrId(err) +")
-            (wl "\" state:\" + enumNameForState(state);"))
-          (define-c++-block "Err(std::string message) : err(kErrIdGeneralError)"
-            (wl "this->message = enumNameForErrId(err) + \" \" + message;"))
-          (define-c++-block "Err(const char* message) : err(kErrIdGeneralError)"
-            (wl "this->message = enumNameForErrId(err) + \" \" +std::string(message);"))
-          (define-c++-block "virtual const char* what() const noexcept"
-            (wl "return message.c_str();"))))
-    (wlb "bool isLogEnabled = false;")
-    (wl "static StateMachine create() {")
-    (wl (format nil "  return StateMachine(~a);"
-                (state-const-sym (sym->camelcase (get-start *machine*)))))
-    (wlb "}")
-    (define-c++-doc "Description of the error from last action.")
-    (define-c++-fun "errorDescription" "std::string" ""
-      (define-c++-block "if (lastActionError)"
-        (wl "const char* rv = lastActionError->what();")
-        (wl "return std::string(rv);"))
-      (wl "return \"\";"))
-    (loop-decisions (decision)
-                    (define-c++-doc (format nil "Set decision for ~a" (sym->decision decision)))
-                    (define-c++-fun (format nil "setDecision~a" (sym->pascalcase decision)) "void"
-                      "Decision decision"
-                      (wl (format nil "~a = decision;" (sym->decision decision)))))
-    (dolist (action (actions *machine*))
-      (let ((ap (sym->pascalcase action))
-            (ac (sym->camelcase action)))
-        (define-c++-doc (format nil "Set action ~a" (action-const-sym ac)))
-        (define-c++-fun (format nil "setAction~a" ap) "void" "ActionExecutor action"
-          (wl (format nil "action~a = action;" ap)))
-        (define-c++-doc (format nil "Execute action ~a from current state"
-                                (action-const-sym ac)))
-        (define-c++-fun (format nil "doAction~a" ap) "void" "Completion completion"
-          (wl (format nil "doAction(~a, completion);" (action-const-sym ac))))))
-    (define-c++-doc "Inspect the current state.")
-    (define-c++-fun "getState" "State" ""
-      (wl "return state;"))
-    (define-c++-doc "Inspect the last action executed.")
-    (define-c++-fun "getLastAction" "Action" ""
-      (wl "return lastAction;"))
-    (define-c++-doc "Inspect the last action error.")
-    (define-c++-fun "getLastActionError" "std::exception*" ""
-      (wl "return lastActionError;"))
-    (define-c++-doc "Start method. Must be called, otherwise, the state machine is not running.")
-    (define-c++-fun "start" "void" ""
-      (wl "// check decisions")
+  (let ((cls-name (s+ (sym->pascalcase (context *machine*)) "StateMachine")))
+    (define-c++-class cls-name
+        (define-c++-class-section "public")
+      (define-c++-doc "The states of the state machine. A state fully defines properties necessary to decide user actions.")
+      (define-c++-enum "State" (get-states *machine*))
+      (define-c++-doc "The actions of the state machine. An action connects two states.")
+      (define-c++-enum "Action" (actions *machine*))
+      (define-c++-enum "ErrId" *errors*)
+      (wl "typedef std::function<void(bool)> Completion;")
+      (wl "typedef std::function<void(Completion)> ActionExecutor;")
+      (wl "typedef std::tuple<State, Action, State> Transition;")
+      (wlb "typedef std::function<bool()> Decision;")
+      (define-c++-class "Err : public std::exception"
+          (define-c++-class-section "public"
+              (wl "ErrId err;")
+            (wl "std::string message;")
+            (wl)
+            (define-c++-block "Err() : err(kErrIdSuccess)")
+            (define-c++-block "Err(ErrId err, State state, Action action) : err(err)"
+                (wl "this->message = enumNameForErrId(err) +")
+              (wl "\" state:\" + enumNameForState(state) +")
+              (wl "\" action:\" + enumNameForAction(action);"))
+            (define-c++-block "Err(ErrId err, State state) : err(err)"
+                (wl "this->message = enumNameForErrId(err) +")
+              (wl "\" state:\" + enumNameForState(state);"))
+            (define-c++-block "Err(std::string message) : err(kErrIdGeneralError)"
+                (wl "this->message = enumNameForErrId(err) + \" \" + message;"))
+            (define-c++-block "Err(const char* message) : err(kErrIdGeneralError)"
+                (wl "this->message = enumNameForErrId(err) + \" \" +std::string(message);"))
+            (define-c++-block "virtual const char* what() const noexcept"
+                (wl "return message.c_str();"))))
+      (wlb "bool isLogEnabled = false;")
+      (wl "static ~a create() {" cls-name)
+      (wl "  return ~a(~a);"
+          cls-name
+          (state-const-sym (sym->camelcase (get-start *machine*))))
+      (wlb "}")
+      (define-c++-doc "Description of the error from last action.")
+      (define-c++-fun "errorDescription" "std::string" ""
+        (define-c++-block "if (lastActionError)"
+            (wl "const char* rv = lastActionError->what();")
+          (wl "return std::string(rv);"))
+        (wl "return \"\";"))
       (loop-decisions (decision)
-                      (define-c++-block (format nil "if (!~a)" (sym->decision decision))
-                        (wl (format nil "throw Err(\"Machine not started because decision '~a' is missing\");"
-                                    (sym->camelcase decision)))))
-      (wl)
-      (wl "// check actions")
+                      (define-c++-doc (format nil "Set decision for ~a" (sym->decision decision)))
+                      (define-c++-fun (format nil "setDecision~a" (sym->pascalcase decision)) "void"
+                        "Decision decision"
+                        (wl (format nil "~a = decision;" (sym->decision decision)))))
       (dolist (action (actions *machine*))
-        (define-c++-block (format nil "if (!action~a)" (sym->pascalcase action))
-          (wl (format nil "throw Err(\"Machine not started because action '~a' is missing\");"
-                      (sym->camelcase action)))))
-      (wl)
-      (wl "// start the machine")
-      (define-c++-block "try"
-          (wl "moveToState(state, [](bool){});"))
-      (define-c++-block "catch (std::exception& e)"
-          (wl "throw std::runtime_error(e.what());")))
+        (let ((ap (sym->pascalcase action))
+              (ac (sym->camelcase action)))
+          (define-c++-doc (format nil "Set action ~a" (action-const-sym ac)))
+          (define-c++-fun (format nil "setAction~a" ap) "void" "ActionExecutor action"
+            (wl (format nil "action~a = action;" ap)))
+          (define-c++-doc (format nil "Execute action ~a from current state"
+                                  (action-const-sym ac)))
+          (define-c++-fun (format nil "doAction~a" ap) "void" "Completion completion"
+            (wl (format nil "doAction(~a, completion);" (action-const-sym ac))))))
+      (define-c++-doc "Inspect the current state.")
+      (define-c++-fun "getState" "State" ""
+        (wl "return state;"))
+      (define-c++-doc "Inspect the last action executed.")
+      (define-c++-fun "getLastAction" "Action" ""
+        (wl "return lastAction;"))
+      (define-c++-doc "Inspect the last action error.")
+      (define-c++-fun "getLastActionError" "std::exception*" ""
+        (wl "return lastActionError;"))
+      (define-c++-doc "Start method. Must be called, otherwise, the state machine is not running.")
+      (define-c++-fun "start" "void" ""
+        (wl "// check decisions")
+        (loop-decisions (decision)
+                        (define-c++-block (format nil "if (!~a)" (sym->decision decision))
+                            (wl (format nil "throw Err(\"Machine not started because decision '~a' is missing\");"
+                                        (sym->camelcase decision)))))
+        (wl)
+        (wl "// check actions")
+        (dolist (action (actions *machine*))
+          (define-c++-block (format nil "if (!action~a)" (sym->pascalcase action))
+              (wl (format nil "throw Err(\"Machine not started because action '~a' is missing\");"
+                          (sym->camelcase action)))))
+        (wl)
+        (wl "// start the machine")
+        (define-c++-block "try"
+            (wl "moveToState(state, [](bool){});"))
+        (define-c++-block "catch (std::exception& e)"
+            (wl "throw std::runtime_error(e.what());")))
 
-    (define-c++-class-section "private")
-    (define-c++-doc "Flag to indicate whether or not this class prints debugging messages.")
-    (define-c++-doc "Current state.")
-    (wlb "State state;")
-    (define-c++-doc "Last action.")
-    (wlb "Action lastAction;")
-    (define-c++-doc "Last action error.")
-    (wlb "std::exception* lastActionError = NULL;")
-    (define-c++-doc "Actions")
-    (dolist (action (actions *machine*))
-      (wl "ActionExecutor action~a;" (sym->pascalcase action)))
-    (wl)
-    (define-c++-doc "Decisions")
-    (loop-decisions (decision)
-                    (wl "Decision ~a;" (sym->decision decision)))
-    (wl)
-    (define-c++-doc "Transitions")
-    (let ((transitions (transitions *machine*)))
-      (wl "Transition transitions[~a] = {" (length transitions))
-      (dolist (trans transitions)
-        (wl "  {~{~a~^, ~}}," (list (state-const-sym (nth 0 trans))
-                               (action-const-sym (nth 1 trans))
-                               (state-const-sym (nth 2 trans)))))
-      (wlb "};"))
-    (wl "StateMachine(State state) {")
-    (wl "  this->state = state;")
-    (wlb "}")
-    (define-c++-fun "doAction" "void " "Action action, Completion completion"
-      (wl "log(\"doAction \" + enumNameForAction(action));")
-      (wl "lastAction = action;")
+      (define-c++-class-section "private")
+      (define-c++-doc "Flag to indicate whether or not this class prints debugging messages.")
+      (define-c++-doc "Current state.")
+      (wlb "State state;")
+      (define-c++-doc "Last action.")
+      (wlb "Action lastAction;")
+      (define-c++-doc "Last action error.")
+      (wlb "std::exception* lastActionError = NULL;")
+      (define-c++-doc "Actions")
+      (dolist (action (actions *machine*))
+        (wl "ActionExecutor action~a;" (sym->pascalcase action)))
       (wl)
-      (wl "ActionExecutor actionExec;")
-      (define-c++-block "switch (action)"
-          (dolist (action (actions *machine*))
-            (let ((ac (sym->camelcase action))
-                  (ap (sym->pascalcase action)))
-              (wl (format nil "case ~a:" (action-const-sym ac)))
-              (wl (format nil "actionExec = action~a;" ap))
-              (wl "break;"))))
-      (define-c++-try
-          ((wl "Transition transition = findTransition(action);")
-           (wl "if (!actionExec) {")
-           (wl "  throw Err(kErrIdTransitionNotSet, state, action);")
-           (wl "}")
-           (define-c++-block "actionExec([&](bool success)"
-               (define-c++-block "if (!success)"
-                 (wl "completion(false);")
-                 (wl "return;"))
-             (define-c++-try
-                 ((wl "moveToState(std::get<2>(transition), completion);"))
-                 ((wl "lastActionError = &e;")
-                  (wl "completion(false);"))))
-           (wl ");"))
-          ((wl "lastActionError = &e;")
-           (wl "completion(false);"))))
-    (define-c++-fun "findTransition" "Transition" "Action action"
-      (define-c++-block "for (auto cand : transitions)"
-          (wl "if (std::get<0>(cand) == state && std::get<1>(cand) == action) {")
-        (wl "  return cand;")
-        (wl "}"))
+      (define-c++-doc "Decisions")
+      (loop-decisions (decision)
+                      (wl "Decision ~a;" (sym->decision decision)))
+      (wl)
+      (define-c++-doc "Transitions")
+      (let ((transitions (transitions *machine*)))
+        (wl "Transition transitions[~a] = {" (length transitions))
+        (dolist (trans transitions)
+          (wl "  {~{~a~^, ~}}," (list (state-const-sym (nth 0 trans))
+                                      (action-const-sym (nth 1 trans))
+                                      (state-const-sym (nth 2 trans)))))
+        (wlb "};"))
+      (wl "~a(State state) {" cls-name)
+      (wl "  this->state = state;")
+      (wlb "}")
+      (define-c++-fun "doAction" "void " "Action action, Completion completion"
+        (wl "log(\"doAction \" + enumNameForAction(action));")
+        (wl "lastAction = action;")
+        (wl)
+        (wl "ActionExecutor actionExec;")
+        (define-c++-block "switch (action)"
+            (dolist (action (actions *machine*))
+              (let ((ac (sym->camelcase action))
+                    (ap (sym->pascalcase action)))
+                (wl (format nil "case ~a:" (action-const-sym ac)))
+                (wl (format nil "actionExec = action~a;" ap))
+                (wl "break;"))))
+        (define-c++-try
+            ((wl "Transition transition = findTransition(action);")
+             (wl "if (!actionExec) {")
+             (wl "  throw Err(kErrIdTransitionNotSet, state, action);")
+             (wl "}")
+             (define-c++-block "actionExec([&](bool success)"
+                 (define-c++-block "if (!success)"
+                     (wl "completion(false);")
+                   (wl "return;"))
+               (define-c++-try
+                   ((wl "moveToState(std::get<2>(transition), completion);"))
+                   ((wl "lastActionError = &e;")
+                    (wl "completion(false);"))))
+             (wl ");"))
+            ((wl "lastActionError = &e;")
+             (wl "completion(false);"))))
+      (define-c++-fun "findTransition" "Transition" "Action action"
+        (define-c++-block "for (auto cand : transitions)"
+            (wl "if (std::get<0>(cand) == state && std::get<1>(cand) == action) {")
+          (wl "  return cand;")
+          (wl "}"))
         (wl "throw Err(kErrIdImpossibleAction, state, action);"))
-    (define-c++-fun "getOnePossibleAction" "Action" "State state"
-      (define-c++-block "for (auto cand : transitions)"
-        (wl "if (std::get<0>(cand) == state) {")
-        (wl "  return std::get<1>(cand);")
-        (wl "}"))
-      (wl "throw Err(kErrIdNoActionsForState, state);"))
-    (define-c++-fun "moveToState" "void" "State state, Completion completion"
-      (wl "this->state = state;")
-      (wlb "log(\"moveToState \" + enumNameForState(state));")
-      (define-c++-block "switch (state)"
-          (dolist (state (get-states *machine*))
-            (wl (format nil "case ~a:" (state-const-sym (sym->camelcase state))))
-            (cond ((decision-state-p state *machine*)
-                   (loop for decision in (get-unstable-state-decisions state *machine*)
-                         for i from 0 do
-                           (if (listp decision)
-                               (let ((sd (sym->decision (car decision))))
-                                 (define-c++-block (format nil "~:[~;else ~]if (~a())" (> i 0) sd)
+      (define-c++-fun "getOnePossibleAction" "Action" "State state"
+        (define-c++-block "for (auto cand : transitions)"
+            (wl "if (std::get<0>(cand) == state) {")
+          (wl "  return std::get<1>(cand);")
+          (wl "}"))
+        (wl "throw Err(kErrIdNoActionsForState, state);"))
+      (define-c++-fun "moveToState" "void" "State state, Completion completion"
+        (wl "this->state = state;")
+        (wlb "log(\"moveToState \" + enumNameForState(state));")
+        (define-c++-block "switch (state)"
+            (dolist (state (get-states *machine*))
+              (wl (format nil "case ~a:" (state-const-sym (sym->camelcase state))))
+              (cond ((decision-state-p state *machine*)
+                     (loop for decision in (get-unstable-state-decisions state *machine*)
+                           for i from 0 do
+                             (if (listp decision)
+                                 (let ((sd (sym->decision (car decision))))
+                                   (define-c++-block (format nil "~:[~;else ~]if (~a())" (> i 0) sd)
+                                       (wl (format nil "moveToState(~a, completion);"
+                                                   (state-const-sym (sym->camelcase (cdr decision)))))))
+                                 (define-c++-block "else"
                                      (wl (format nil "moveToState(~a, completion);"
-                                                 (state-const-sym (sym->camelcase (cdr decision)))))))
-                               (define-c++-block "else"
-                                   (wl (format nil "moveToState(~a, completion);"
-                                               (state-const-sym (sym->camelcase decision))))))))
-                  ((transitive-state-p state *machine*)
-                   (wl "doAction(getOnePossibleAction(~a), completion);"
-                       (state-const-sym (sym->camelcase state))))
-                  (t (wl "completion(true);")))
-            (wl "break;"))))
-    (define-c++-fun "log" "void" "std::string msg"
-      (define-c++-block "if (isLogEnabled)"
-          (wl "std::cout << \"StateMachine: \" << msg << std::endl;")))))
+                                                 (state-const-sym (sym->camelcase decision))))))))
+                    ((transitive-state-p state *machine*)
+                     (wl "doAction(getOnePossibleAction(~a), completion);"
+                         (state-const-sym (sym->camelcase state))))
+                    (t (wl "completion(true);")))
+              (wl "break;"))))
+      (define-c++-fun "log" "void" "std::string msg"
+        (define-c++-block "if (isLogEnabled)"
+            (wl "std::cout << \"~a: \" << msg << std::endl;" cls-name))))))
 
 (defun gen-usage-stream (path-code)
   (wl (format nil "#include \"~a\"" (file-name path-code)))
   (wl)
-  (define-c++-class "StateMachineTest"
-      (define-c++-class-section "public"
-          (define-c++-fun "test" "void" ""
-            (wl "StateMachine sm = StateMachine::create();")
-            (wl "sm.isLogEnabled = true;")
-            (loop-decisions (decision)
-                            (wl (format nil "sm.setDecision~a([&]() { /*TODO*/ return falsity(); });"
-                                        (sym->pascalcase decision))))
-            (dolist (action (actions *machine*))
-              (wl (format nil "sm.setAction~a([&](StateMachine::Completion completion) { ~a~a(completion); });"
-                          (sym->pascalcase action)
-                          (sym->camelcase action)
-                          (sym->pascalcase (context *machine*)))))
-            (wl "sm.start();")
-            (wl)
-            (wl "std::cout << \"-- Testing out a few actions:\" << std::endl;")
-            (dolist (action (actions *machine*))
-              (define-c++-block (format nil "sm.doAction~a([&](bool success)"
-                                        (sym->pascalcase action))
-                (wl "std::cout << \"-- success:\" << success << std::endl;")
-                (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
-              (wl ");"))))
-    (define-c++-class-section "private"
-        (dolist (action (actions *machine*))
-          (let ((func-name (format nil "~a~a"
-                                   (sym->camelcase action)
-                                   (sym->pascalcase (context *machine*)))))
-            (define-c++-fun func-name "void" "StateMachine::Completion completion"
-              (wl (format nil "// TODO: add logic for ~a" func-name))
-              (wl "std::cout << \"-- StateMachineTest: ~a\" << std::endl;" func-name)
-              (wl "completion(true);"))))
-      (define-c++-fun "falsity" "bool" ""
-        (wl "return false;"))))
-  (define-c++-fun "main" "int" "int argc, char** argv"
-    (wl "StateMachineTest().test();")
-    (wl "return 0;")))
+  (let* ((sm-name (s+ (sym->pascalcase (context *machine*)) "StateMachine"))
+         (cls-name (s+ sm-name "Test")))
+    (define-c++-class cls-name
+        (define-c++-class-section "public"
+            (define-c++-fun "test" "void" ""
+              (wl "~a sm = ~a::create();" sm-name sm-name)
+              (wl "sm.isLogEnabled = true;")
+              (loop-decisions (decision)
+                              (wl (format nil "sm.setDecision~a([&]() { /*TODO*/ return falsity(); });"
+                                          (sym->pascalcase decision))))
+              (dolist (action (actions *machine*))
+                (wl (format nil "sm.setAction~a([&](~a::Completion completion) { ~a~a(completion); });"
+                            (sym->pascalcase action)
+                            sm-name
+                            (sym->camelcase action)
+                            (sym->pascalcase (context *machine*)))))
+              (wl "sm.start();")
+              (wl)
+              (wl "std::cout << \"-- Testing out a few actions:\" << std::endl;")
+              (dolist (action (actions *machine*))
+                (define-c++-block (format nil "sm.doAction~a([&](bool success)"
+                                          (sym->pascalcase action))
+                    (wl "std::cout << \"-- success:\" << success << std::endl;")
+                  (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
+                (wl ");"))))
+      (define-c++-class-section "private"
+          (dolist (action (actions *machine*))
+            (let ((func-name (format nil "~a~a"
+                                     (sym->camelcase action)
+                                     (sym->pascalcase (context *machine*)))))
+              (define-c++-fun func-name "void" (s+ sm-name "::Completion completion")
+                (wl (format nil "// TODO: add logic for ~a" func-name))
+                (wl "std::cout << \"-- ~a: ~a\" << std::endl;" cls-name func-name)
+                (wl "completion(true);"))))
+        (define-c++-fun "falsity" "bool" ""
+          (wl "return false;"))))
+    (define-c++-fun "main" "int" "int argc, char** argv"
+      (wl "~a().test();" cls-name)
+      (wl "return 0;"))))
 
 (defun save-and-check-c++ (machine path-code path-usage)
   (format t "~&Generating code…~%")
