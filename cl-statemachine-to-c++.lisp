@@ -418,15 +418,13 @@
                           (sym->pascalcase (context *machine*)))))
             (wl "sm.start();")
             (wl)
-            (wl "std::cout << \"-- This returns a specific exception:\" << std::endl;")
-            (define-c++-block "sm.doActionGoToF([&](bool success)"
-              (wl "std::cout << \"-- success:\" << success << std::endl;")
-              (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
-            (wl ");")
-            (wl "std::cout << \"-- This moves through various states:\" << std::endl;")
-            (define-c++-block "sm.doActionGoToG([&](bool success)"
-              (wl "std::cout << \"-- success:\" << success << std::endl;"))
-            (wl ");")))
+            (wl "std::cout << \"-- Testing out a few actions:\" << std::endl;")
+            (dolist (action (actions machine))
+              (define-c++-block (format nil "sm.doAction~a([&](bool success)"
+                                        (sym->pascalcase action))
+                (wl "std::cout << \"-- success:\" << success << std::endl;")
+                (wl "std::cout << \"-- error:\" << sm.errorDescription() << std::endl;"))
+              (wl ");"))))
     (define-c++-class-section "private"
         (dolist (action (actions *machine*))
           (let ((func-name (format nil "~a~a"
