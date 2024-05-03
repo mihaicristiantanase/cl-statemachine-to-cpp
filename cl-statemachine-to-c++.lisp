@@ -426,7 +426,7 @@
             (wl "sm.start();")
             (wl)
             (wl "std::cout << \"-- Testing out a few actions:\" << std::endl;")
-            (dolist (action (actions machine))
+            (dolist (action (actions *machine*))
               (define-c++-block (format nil "sm.doAction~a([&](bool success)"
                                         (sym->pascalcase action))
                 (wl "std::cout << \"-- success:\" << success << std::endl;")
